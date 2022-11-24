@@ -38,7 +38,7 @@ def test_prepare_system(shell):
     assert (
         shell(
             ("subscription-manager register --org={} --activationkey={}").format(
-                env.str("SATELLITE_ORG"), env.str("SATELLITE_KEY_CENTOS7")
+                env.str("SATELLITE_ORG"), env.str("SATELLITE_KEY")
             )
         ).returncode
         == 0
