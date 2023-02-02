@@ -268,3 +268,37 @@ def test_set_target_os(pretend_os):
         "name": "CentOS Linux",
         "version": "7.9",
     } == breadcrumbs.breadcrumbs.target_os
+
+
+@pytest.mark.parametrize(("telemetry_disabled", "telemetry_called"), [(True, 0), (False, 1)])
+def test_disable_telemetry(telemetry_disabled, telemetry_called, monkeypatch):
+    if telemetry_disabled:
+        monkeypatch.setenv("CONVERT2RHEL_DISABLE_TELEMETRY", "1")
+
+    _save_migration_results = mock.Mock()
+    _save_rhsm_facts = mock.Mock()
+
+    monkeypatch.setattr(breadcrumbs.breadcrumbs, "_save_migration_results", _save_migration_results)
+    monkeypatch.setattr(breadcrumbs.breadcrumbs, "_save_rhsm_facts", _save_rhsm_facts)
+
+    # Set started time to pretend early data were collected
+    breadcrumbs.breadcrumbs._set_started()
+
+    breadcrumbs.breadcrumbs.finish_collection()
+
+    assert _save_migration_results.call_count == 1
+    assert _save_rhsm_facts.call_count == telemetry_called
+
+
+def test_early_data_not_collected(monkeypatch):
+    _save_migration_results = mock.Mock()
+    _save_rhsm_facts = mock.Mock()
+
+    monkeypatch.setattr(breadcrumbs.breadcrumbs, "_save_migration_results", _save_migration_results)
+    monkeypatch.setattr(breadcrumbs.breadcrumbs, "_save_rhsm_facts", _save_rhsm_facts)
+    breadcrumbs.breadcrumbs.__init__()  # make sure everything is set to default
+
+    breadcrumbs.breadcrumbs.finish_collection()
+
+    _save_migration_results.assert_called_once()
+    _save_rhsm_facts.assert_not_called()

@@ -87,8 +87,10 @@ class Breadcrumbs(object):
             self._set_target_os()
 
         self._set_ended()
+
         self._save_migration_results()
-        self._save_rhsm_facts()
+        if self.activity_started != "null" and "CONVERT2RHEL_DISABLE_TELEMETRY" not in os.environ:
+            self._save_rhsm_facts()
 
     def _set_pkg_object(self):
         """Set pkg_object which is used to get information about installed Convert2RHEL"""

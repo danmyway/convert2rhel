@@ -378,6 +378,7 @@ def test_main(monkeypatch):
     initialize_logger_mock = mock.Mock()
     toolopts_cli_mock = mock.Mock()
     show_eula_mock = mock.Mock()
+    print_data_collection_mock = mock.Mock()
     resolve_system_info_mock = mock.Mock()
     collect_early_data_mock = mock.Mock()
     clean_yum_metadata_mock = mock.Mock()
@@ -401,6 +402,7 @@ def test_main(monkeypatch):
     monkeypatch.setattr(main, "initialize_logger", initialize_logger_mock)
     monkeypatch.setattr(toolopts, "CLI", toolopts_cli_mock)
     monkeypatch.setattr(main, "show_eula", show_eula_mock)
+    monkeypatch.setattr(main, "print_data_collection", print_data_collection_mock)
     monkeypatch.setattr(system_info, "resolve_system_info", resolve_system_info_mock)
     monkeypatch.setattr(breadcrumbs, "collect_early_data", collect_early_data_mock)
     monkeypatch.setattr(pkghandler, "clear_versionlock", clear_versionlock_mock)
@@ -425,6 +427,7 @@ def test_main(monkeypatch):
     assert initialize_logger_mock.call_count == 1
     assert toolopts_cli_mock.call_count == 1
     assert show_eula_mock.call_count == 1
+    assert print_data_collection_mock.call_count == 1
     assert resolve_system_info_mock.call_count == 1
     assert collect_early_data_mock.call_count == 1
     assert clean_yum_metadata_mock.call_count == 1
@@ -472,6 +475,7 @@ def test_main_rollback_pre_ponr_changes_phase(monkeypatch):
     initialize_logger_mock = mock.Mock()
     toolopts_cli_mock = mock.Mock()
     show_eula_mock = mock.Mock()
+    print_data_collection_mock = mock.Mock()
     resolve_system_info_mock = mock.Mock()
     collect_early_data_mock = mock.Mock()
     clean_yum_metadata_mock = mock.Mock()
@@ -491,6 +495,7 @@ def test_main_rollback_pre_ponr_changes_phase(monkeypatch):
     monkeypatch.setattr(main, "initialize_logger", initialize_logger_mock)
     monkeypatch.setattr(toolopts, "CLI", toolopts_cli_mock)
     monkeypatch.setattr(main, "show_eula", show_eula_mock)
+    monkeypatch.setattr(main, "print_data_collection", print_data_collection_mock)
     monkeypatch.setattr(system_info, "resolve_system_info", resolve_system_info_mock)
     monkeypatch.setattr(breadcrumbs, "collect_early_data", collect_early_data_mock)
     monkeypatch.setattr(pkghandler, "clear_versionlock", clear_versionlock_mock)
@@ -509,6 +514,7 @@ def test_main_rollback_pre_ponr_changes_phase(monkeypatch):
     assert initialize_logger_mock.call_count == 1
     assert toolopts_cli_mock.call_count == 1
     assert show_eula_mock.call_count == 1
+    assert print_data_collection_mock.call_count == 1
     assert resolve_system_info_mock.call_count == 1
     assert collect_early_data_mock.call_count == 1
     assert clean_yum_metadata_mock.call_count == 1
@@ -528,6 +534,7 @@ def test_main_rollback_post_ponr_changes_phase(monkeypatch, caplog):
     initialize_logger_mock = mock.Mock()
     toolopts_cli_mock = mock.Mock()
     show_eula_mock = mock.Mock()
+    print_data_collection_mock = mock.Mock()
     resolve_system_info_mock = mock.Mock()
     collect_early_data_mock = mock.Mock()
     clean_yum_metadata_mock = mock.Mock()
@@ -549,6 +556,7 @@ def test_main_rollback_post_ponr_changes_phase(monkeypatch, caplog):
     monkeypatch.setattr(main, "initialize_logger", initialize_logger_mock)
     monkeypatch.setattr(toolopts, "CLI", toolopts_cli_mock)
     monkeypatch.setattr(main, "show_eula", show_eula_mock)
+    monkeypatch.setattr(main, "print_data_collection", print_data_collection_mock)
     monkeypatch.setattr(system_info, "resolve_system_info", resolve_system_info_mock)
     monkeypatch.setattr(breadcrumbs, "collect_early_data", collect_early_data_mock)
     monkeypatch.setattr(pkghandler, "clear_versionlock", clear_versionlock_mock)
@@ -569,6 +577,7 @@ def test_main_rollback_post_ponr_changes_phase(monkeypatch, caplog):
     assert initialize_logger_mock.call_count == 1
     assert toolopts_cli_mock.call_count == 1
     assert show_eula_mock.call_count == 1
+    assert print_data_collection_mock.call_count == 1
     assert resolve_system_info_mock.call_count == 1
     assert collect_early_data_mock.call_count == 1
     assert clean_yum_metadata_mock.call_count == 1
@@ -584,3 +593,19 @@ def test_main_rollback_post_ponr_changes_phase(monkeypatch, caplog):
     assert finish_collection_mock.call_count == 1
     assert "The system is left in an undetermined state that Convert2RHEL cannot fix." in caplog.records[-1].message
     assert update_rhsm_custom_facts_mock.call_count == 1
+
+
+@pytest.mark.parametrize(("telemetry_disabled", "call_count"), [(True, 0), (False, 1)])
+def test_print_data_collection(telemetry_disabled, call_count, monkeypatch, caplog):
+    if telemetry_disabled:
+        monkeypatch.setenv("CONVERT2RHEL_DISABLE_TELEMETRY", "1")
+
+    ask_to_continue = mock.Mock()
+    monkeypatch.setattr(utils, "ask_to_continue", ask_to_continue)
+
+    main.print_data_collection()
+
+    ask_to_continue.call_count == call_count
+
+    if telemetry_disabled:
+        assert "Skipping, data collection disabled." in caplog.records[-1].message
