@@ -49,10 +49,13 @@ def test_smoke_basic(shell):
     assert shell("convert2rhel --no-rpm-va <<< n").returncode != 0
 
 
-def test_log_file_verification():
+@pytest.mark.log_file_exists
+def test_log_file_verification(shell):
     """
-    Verify that the log file was created by the previous test.
+    Verify that the log file was created by the Convert2RHEL run.
     """
+    assert shell("convert2rhel --no-rpm-va <<< n").returncode != 0
+
     assert os.path.exists("/var/log/convert2rhel/convert2rhel.log")
 
 
@@ -114,7 +117,7 @@ def test_c2r_latest_older_inhibit(convert2rhel):
 
 
 @pytest.mark.version_older_with_envar
-def test_c2r_latest_older_unsupported_version(convert2rhel, get_system_release):
+def test_c2r_latest_older_unsupported_version(convert2rhel):
     """
     Verify, that running older version of Convert2RHEL with the environment
     variable "CONVERT2RHEL_ALLOW_OLDER_VERSION" continues the conversion.
