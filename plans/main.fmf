@@ -1,7 +1,7 @@
 execute:
-    how: tmt
+    - how: tmt
 discover:
-    how: fmf
+    - how: fmf
 environment:
     NO_COLOR: 1
 
