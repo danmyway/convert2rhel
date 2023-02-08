@@ -6,9 +6,3 @@ description: |
     Tested methods: satellite, RHSM, non-EUS RHSM, activation key and custom repos.
 
 tier: 1
-
-/activation_key:
-    tag+:
-        - activation-key
-    test: |
-        pytest -svv -m activation_key

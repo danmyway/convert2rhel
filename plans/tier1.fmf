@@ -1,16 +1,14 @@
-execute+:
-    - name: After conversion checks
-      how: tmt
-      test: checks-after-conversion
+discover+:
+    test: checks-after-conversion
 
 /activation_key:
-  discover+:
+  prepare+:
   - name: main conversion preparation
-    how: tmt
-    test: method/activation_key
-  - name: reboot after conversion
     how: shell
-    script: tmt-reboot
+    script: pytest -svv tests/integration/tier1/method/activation_key.py
+  - name: reboot after conversion
+    how: ansible
+    playbook: tests/ansible_collections/roles/reboot/main.yml
 
 /rhsm:
   prepare+:

@@ -1,9 +1,6 @@
-import pytest
-
 from envparse import env
 
 
-@pytest.mark.activation_key
 def test_activation_key_conversion(convert2rhel):
     with convert2rhel(
         ("-y --no-rpm-va --serverurl {} -k {} -o {} --debug").format(
