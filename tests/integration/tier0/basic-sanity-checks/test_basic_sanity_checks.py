@@ -1,6 +1,11 @@
 import os
 import subprocess
 
+import pytest
+
+
+CONVERT2RHEL_FACTS_FILE = "/etc/rhsm/facts/convert2rhel.facts"
+
 
 def test_check_user_privileges(shell):
     """
@@ -179,3 +184,55 @@ def test_check_variant_message(convert2rhel):
         c2r.expect("Continue with the system conversion?")
         c2r.sendline("n")
     assert c2r.exitstatus != 0
+
+
+@pytest.mark.data_collection_acknowledgement
+def test_data_collection_acknowledgement(shell, convert2rhel):
+    """
+    This test verifies, that information about data collection is printed out
+    and user is asked for acknowledgement to continue.
+    Verify, that without acknowledgement the convert2rhel.facts file is not created.
+    """
+    # Remove facts from previous runs.
+    shell(f"rm {CONVERT2RHEL_FACTS_FILE}")
+    # Remove envar disabling telemetry just in case.
+    del os.environ["CONVERT2RHEL_DISABLE_TELEMETRY"]
+
+    with convert2rhel("--no-rpm-va --debug") as c2r:
+        assert c2r.expect("Prepare: Acknowledge data collection", timeout=300)
+        assert c2r.expect(
+            "The convert2rhel utility uploads the following data about the system conversion", timeout=300
+        )
+        assert c2r.expect("Continue with the system conversion", timeout=300)
+        c2r.sendline("n")
+
+        # Verify the file is not created if user refuses the collection.
+        assert not os.path.exists(CONVERT2RHEL_FACTS_FILE)
+
+    assert c2r.exitstatus != 0
+
+
+@pytest.mark.disable_data_collection
+def test_disable_data_collection(shell, convert2rhel):
+    """
+    This test verifies functionality of CONVERT2RHEL_DISABLE_TELEMETRY envar.
+    The data collection should be disabled, therefore convert2rhel.facts file should not get created.
+    """
+    # Remove facts from previous runs.
+    shell("rm /etc/rhsm/facts/convert2rhel.facts")
+    # Set envar to disable data collection
+    os.environ["CONVERT2RHEL_DISABLE_TELEMETRY"] = "1"
+
+    with convert2rhel("--no-rpm-va --debug") as c2r:
+        assert c2r.expect("Prepare: Acknowledge data collection", timeout=300)
+        assert c2r.expect("Skipping, data collection disabled", timeout=300)
+        assert c2r.expect("Continue with the system conversion", timeout=300)
+        c2r.sendline("n")
+
+        # Verify the file is not created if CONVERT2RHEL_DISABLE_TELEMETRY is set.
+        assert not os.path.exists("/etc/rhsm/facts/convert2rhel.facts")
+
+    assert c2r.exitstatus != 0
+
+    # Remove envar disabling telemetry.
+    del os.environ["CONVERT2RHEL_DISABLE_TELEMETRY"]

@@ -1,4 +1,9 @@
 /activation_key:
+    adjust+:
+        - environment+:
+            CONVERT2RHEL_DISABLE_TELEMETRY: 1
+        - tag+:
+            - CONVERT2RHEL_DISABLE_TELEMETRY
     discover+:
         test: checks-after-conversion
     prepare+:

@@ -1,6 +1,9 @@
 import os
 
+import pytest
 
+
+@pytest.mark.delete_temporary_folder
 def test_temp_folder():
     """Testing, if the temporary folder was sucessfully removed after conversion"""
     tmp_folder = "/var/lib/convert2rhel/"
