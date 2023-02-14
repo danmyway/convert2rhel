@@ -110,10 +110,10 @@
         test: checks-after-conversion
     adjust+:
         - environment+:
-            PROMPT_AMOUNT: 2
+            PROMPT_AMOUNT: 3
           when: distro != oraclelinux-8
         - environment+:
-            PROMPT_AMOUNT: 1
+            PROMPT_AMOUNT: 2
           when: distro == oraclelinux-8
     prepare+:
         - name: test no sub manager installed
