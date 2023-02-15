@@ -2,10 +2,8 @@
     adjust+:
         - environment+:
             CONVERT2RHEL_DISABLE_TELEMETRY: 1
-        - tag+:
-            - CONVERT2RHEL_DISABLE_TELEMETRY
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion | tag:CONVERT2RHEL_DISABLE_TELEMETRY
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -16,7 +14,7 @@
 
 /rhsm:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -32,7 +30,7 @@
           when: >
             distro != centos-8.4
     discover+:
-      test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -43,7 +41,7 @@
 
 /satellite:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -54,7 +52,7 @@
 
 /custom_repos:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: add custom repos
           how: ansible
@@ -68,7 +66,7 @@
 
 /changed_yum_conf:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -85,7 +83,7 @@
     environment+:
         PACKAGES: centos-backgrounds centos-gpg-keys
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -101,7 +99,7 @@
     environment+:
         PACKAGES: gnome-documents-libs shim-x64
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -112,7 +110,7 @@
 
 /remove_all_submgr_pkgs:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     adjust+:
         - environment+:
             PROMPT_AMOUNT: 3
@@ -136,7 +134,7 @@
 
 /resolve_dependency:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: install dependency packages
           how: shell
@@ -155,7 +153,7 @@
               distro != centos-7 and
               distro != oraclelinux-7
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: add custom repos
           how: ansible
@@ -181,7 +179,7 @@
 
 /language_test:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: set non english locale
           how: shell
@@ -195,7 +193,7 @@
 
 /missing_os_release:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: remove os-release
           how: shell
@@ -209,7 +207,7 @@
 
 /yum_distro_sync:
     discover+:
-          test: checks-after-conversion
+          filter: tag:checks-after-conversion
     prepare+:
           - name: enable extras repo for Oracle Linux
             how: ansible
@@ -231,7 +229,7 @@
           when: >
             distro != centos-7
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: install subscription manager
           how: ansible
@@ -248,7 +246,7 @@
 
 /system_up_to_date:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: prepare non latest kernel
           how: shell
@@ -275,7 +273,7 @@
           when: >
               distro != centos-8-latest
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: install removed pkgs from CentOS 8.5
           how: ansible
@@ -289,7 +287,7 @@
 
 /changed_grub_valid:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: modify /etc/default/grub with valid changes
           how: shell
@@ -300,7 +298,7 @@
 
 /changed_grub_invalid:
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: modify /etc/default/grub with invalid changes
           how: shell
@@ -315,7 +313,7 @@
           when: >
               distro != centos-8-latest
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: main conversion preparation
           how: shell
@@ -330,7 +328,7 @@
           when: >
               distro != oraclelinux-7
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: install ntp package and remove one dependency
           how: shell
@@ -348,7 +346,7 @@
           when: >
             distro != centos-7
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: remove some pkgs from the excld pkgs config list
           how: shell
@@ -367,7 +365,7 @@
               distro != centos-8-latest and
               distro != oraclelinux-8
     discover+:
-        test: checks-after-conversion
+        filter: tag:checks-after-conversion
     prepare+:
         - name: install multilib packages with dnf
           how: shell

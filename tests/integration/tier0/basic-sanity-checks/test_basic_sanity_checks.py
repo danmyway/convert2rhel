@@ -194,7 +194,7 @@ def test_data_collection_acknowledgement(shell, convert2rhel):
     Verify, that without acknowledgement the convert2rhel.facts file is not created.
     """
     # Remove facts from previous runs.
-    shell(f"rm {CONVERT2RHEL_FACTS_FILE}")
+    shell(f"rm -f {CONVERT2RHEL_FACTS_FILE}")
     # Remove envar disabling telemetry just in case.
     del os.environ["CONVERT2RHEL_DISABLE_TELEMETRY"]
 
@@ -219,7 +219,7 @@ def test_disable_data_collection(shell, convert2rhel):
     The data collection should be disabled, therefore convert2rhel.facts file should not get created.
     """
     # Remove facts from previous runs.
-    shell("rm /etc/rhsm/facts/convert2rhel.facts")
+    shell("rm -f /etc/rhsm/facts/convert2rhel.facts")
     # Set envar to disable data collection
     os.environ["CONVERT2RHEL_DISABLE_TELEMETRY"] = "1"
 
