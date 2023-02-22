@@ -1360,7 +1360,7 @@ class TestIsLoadedKernelLatest:
                 0,
                 "kernel-core",
                 "1",
-                "Detected 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK' environment variable",
+                "Detected 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK' environment variable",
                 id="Unsupported skip with environment var set to 1",
             ),
             pytest.param(
@@ -1368,7 +1368,7 @@ class TestIsLoadedKernelLatest:
                 0,
                 "kernel-core",
                 "0",
-                "Detected 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK' environment variable",
+                "Detected 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK' environment variable",
                 id="Unsupported skip with environment var set to 0",
             ),
             pytest.param(
@@ -1376,7 +1376,7 @@ class TestIsLoadedKernelLatest:
                 0,
                 "kernel-core",
                 None,
-                "Could not find any {0} from repositories to compare against the loaded kernel.",
+                "Could not find any {0} packages in repositories to compare against the loaded kernel.",
                 id="Repoquery failure without environment var",
             ),
         ),
@@ -1431,6 +1431,100 @@ class TestIsLoadedKernelLatest:
             is_loaded_kernel_latest()
 
         assert expected in caplog.records[-1].message
+
+
+@pytest.mark.parametrize(
+    (
+        "repoquery_version",
+        "return_code",
+        "package_name",
+        "unsupported_skip",
+        "allow_skip",
+        "expected",
+        "unsupported_log",
+    ),
+    (
+        (
+            "",
+            0,
+            "kernel-core",
+            "1",
+            "0",
+            "Detected 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK' environment variable, we will skip "
+            "the kernel-core comparison.\nBeware, this could leave your system in a broken state.",
+            "You are using the deprecated 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK'"
+            " environment variable.  Please switch to 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK'"
+            " instead.",
+        ),
+        (
+            "",
+            0,
+            "kernel-core",
+            "0",
+            "1",
+            "Detected 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK' environment variable, we will skip "
+            "the kernel-core comparison.\nBeware, this could leave your system in a broken state.",
+            None,
+        ),
+        (
+            "",
+            0,
+            "kernel-core",
+            "1",
+            "1",
+            "Detected 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK' environment variable, we will skip "
+            "the kernel-core comparison.\nBeware, this could leave your system in a broken state.",
+            "You are using the deprecated 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK'"
+            " environment variable.  Please switch to 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK'"
+            " instead.",
+        ),
+    ),
+)
+def test_is_loaded_kernel_latest_unsupported_skip_env_var(
+    repoquery_version,
+    return_code,
+    package_name,
+    unsupported_skip,
+    allow_skip,
+    expected,
+    unsupported_log,
+    monkeypatch,
+    caplog,
+):
+    run_subprocess_mocked = mock.Mock(
+        spec=run_subprocess,
+        side_effect=run_subprocess_side_effect(
+            (
+                (
+                    "repoquery",
+                    "--setopt=exclude=",
+                    "--quiet",
+                    "--qf",
+                    "C2R\\t%{BUILDTIME}\\t%{VERSION}-%{RELEASE}\\t%{REPOID}",
+                    package_name,
+                ),
+                (
+                    repoquery_version,
+                    return_code,
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        checks,
+        "run_subprocess",
+        value=run_subprocess_mocked,
+    )
+
+    monkeypatch.setattr(os, "environ", {"CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK": allow_skip})
+
+    if unsupported_skip == "1":
+        monkeypatch.setattr(os, "environ", {"CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK": unsupported_skip})
+        is_loaded_kernel_latest()
+        assert unsupported_log in caplog.records[-2].message
+
+    is_loaded_kernel_latest()
+    assert expected in caplog.records[-1].message
 
     @pytest.mark.parametrize(
         (
