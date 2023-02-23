@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 
 import pytest
@@ -53,7 +54,7 @@ def test_missing_kernel_boot_files(convert2rhel, shell):
     """
 
     kernel_name = "kernel"
-    if "centos-8" in SYSTEM_RELEASE_ENV or "oracle-8" in SYSTEM_RELEASE_ENV:
+    if re.match(r"^(centos|oracle|alma|rocky)-8\.\d$", SYSTEM_RELEASE_ENV):
         kernel_name = "kernel-core"
 
     with convert2rhel(
@@ -77,11 +78,11 @@ def test_missing_kernel_boot_files(convert2rhel, shell):
 
         assert c2r.expect("Couldn't verify the kernel boot files in the boot partition.") == 0
 
-    assert c2r.exitstatus == 0
+        # We have to restore the boot files in order to use the checks-after-conversion tests to
+        # assert that the rest of the conversion has succeeded.
+        # We'll do that the same way we're telling the user in a warning message how to fix the problem.
+        # That is by reinstalling the RHEL kernel and re-running grub2-mkconfig.
+        assert shell("yum reinstall {}-{} -y".format(kernel_name, kernel_version)).returncode == 0
+        assert shell("grub2-mkconfig -o /boot/grub2/grub.cfg").returncode == 0
 
-    # We have to restore the boot files in order to use the checks-after-conversion tests to
-    # assert that the rest of the conversion has succeeded.
-    # We'll do that the same way we're telling the user in a warning message how to fix the problem.
-    # That is by reinstalling the RHEL kernel and re-running grub2-mkconfig.
-    assert shell("yum reinstall kernel-{} -y".format(kernel_version)).returncode == 0
-    assert shell("grub2-mkconfig -o /boot/grub2/grub.cfg").returncode == 0
+    assert c2r.exitstatus == 0
