@@ -21,6 +21,10 @@ tag+:
     - check-rollback-handling
 
 /rhsm_cleanup:
+    adjust+:
+        - environment+:
+            PROMPT_AMOUNT: 6
+          when: distro == centos-8-latest
     tag+:
         - rhsm-cleanup
     test: |
