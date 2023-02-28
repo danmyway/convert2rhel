@@ -512,7 +512,7 @@ def download_pkg(
                 # give the warning about the old envar not being used anymore if it is used
                 loggerinst.warning(
                     "You are using the deprecated 'CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK'"
-                    " environment variable.  Please switch to 'CONVERT2RHEL_INCOMPLETE_ROLLBACK' instead."
+                    " environment variable. Please switch to 'CONVERT2RHEL_INCOMPLETE_ROLLBACK' instead."
                 )
 
             # give regular warning if the new envar is used
@@ -528,7 +528,7 @@ def download_pkg(
                 "could put the system in a broken state.\nCheck to ensure that the %s "
                 "repositories are enabled, and the packages are updated to their latest "
                 "versions.\nIf this error still occurs after re-running the conversion, "
-                "you can set the environment variable CONVERT2RHEL_INCOMPLETE_ROLLBACK=1"
+                "you can set the environment variable 'CONVERT2RHEL_INCOMPLETE_ROLLBACK=1'"
                 "to ignore this check." % (pkg, system_info.name)
             )
         return None
