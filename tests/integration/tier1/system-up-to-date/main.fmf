@@ -8,4 +8,15 @@ description: |
 
 tier: 1
 
-test: pytest -svv
+tag+: system-up-to-date
+
+/skip_kernel_check:
+    test: pytest -svv -m skip_kernel_check
+
+/test_non_latest_kernel_inhibitor:
+    test: pytest -svv -m test_non_latest_kernel_inhibitor
+
+/system_not_up_to_date:
+    # We need to run the full conversion test last.
+    order: 51
+    test: pytest -svv -m system_not_up_to_date

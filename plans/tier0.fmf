@@ -4,6 +4,6 @@ description: |
     Latest point of verification for these test is PONR (point of no return).
     Preparation and cleanup phase is implemented in the test itself.
 
-discover+:
-    filter+:
-        'tier: 0'
+#discover+:
+#    filter+:
+#        'tier: 0'

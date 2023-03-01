@@ -1,16 +1,13 @@
 import os
 
+import pytest
+
 from conftest import SYSTEM_RELEASE_ENV
 from envparse import env
 
 
-def test_skip_kernel_check(shell, convert2rhel):
-    """
-    Test that it is possible to use env variable in some case to override
-    the kernel check inhibitor. One of the way to allow this is to not have
-    any kernel packages present in repos.
-    """
-
+@pytest.fixture
+def repositories(shell):
     # Move all repos to other location, so it is not being used
     assert shell("mkdir /tmp/s_backup").returncode == 0
     assert shell("mv /etc/yum.repos.d/* /tmp/s_backup/").returncode == 0
@@ -19,6 +16,54 @@ def test_skip_kernel_check(shell, convert2rhel):
     if "centos-8" in SYSTEM_RELEASE_ENV:
         assert shell("mkdir /tmp/s_backup_eus").returncode == 0
         assert shell("mv /usr/share/convert2rhel/repos/* /tmp/s_backup_eus/").returncode == 0
+
+    yield
+
+    # Clean up
+    if "centos-8" in SYSTEM_RELEASE_ENV:
+        assert shell("mv /tmp/s_backup_eus/* /usr/share/convert2rhel/repos/").returncode == 0
+    assert shell("mv /tmp/s_backup/* /etc/yum.repos.d/").returncode == 0
+    del os.environ["CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK"]
+
+
+@pytest.fixture()
+def downgrade_and_versionlock(shell):
+    centos_8_pkg_url = "https://vault.centos.org/8.1.1911/BaseOS/x86_64/os/Packages/wpa_supplicant-2.7-1.el8.x86_64.rpm"
+    installed_kernel_count = shell("rpm -q kernel | wc -l")
+
+    if "centos-8" in SYSTEM_RELEASE_ENV and installed_kernel_count == 3:
+        # The dnf transaction calculation fails if the maximum number of kernels that can be installed has been reached:
+        # "package kernel-4.18.0-348.23.1.el8_5.x86_64 requires kernel-core-uname-r = 4.18.0-348.23.1.el8_5.x86_64,
+        #     but none of the providers can be installed"
+        # To us now the only known solution is to remove the oldest kernel before proceeding.
+        oldest_kernel = shell(
+            "rpm -q --qf '%{BUILDTIME}\t%{EVR}.%{ARCH}\n' kernel | sort -n | head -1 | cut -f2"
+        ).output.strip()
+        assert shell("yum remove -y kernel*{0}".format(oldest_kernel)).returncode == 0
+
+        # Try to downgrade two packages.
+        # On CentOS-8 we cannot do the downgrade as the repos contain only the latest package version.
+        # We need to install package from older repository as a workaround.
+        assert shell("yum install -y {}".format(centos_8_pkg_url)).returncode == 0
+    else:
+        assert shell("yum install openldap wpa_supplicant -y").returncode == 0
+        assert shell("yum downgrade openldap wpa_supplicant -y").returncode == 0
+
+    assert shell("yum install -y yum-plugin-versionlock").returncode == 0
+    assert shell("yum versionlock wpa_supplicant").returncode == 0
+
+    yield
+
+    assert shell("yum remove -y openldap wpa_supplicant")
+
+
+@pytest.mark.skip_kernel_check
+def test_skip_kernel_check(repositories, shell, convert2rhel):
+    """
+    Test that it is possible to use env variable in some case to override
+    the kernel check inhibitor. One of the way to allow this is to not have
+    any kernel packages present in repos.
+    """
 
     with convert2rhel(
         "-y --no-rpm-va --serverurl {} --username {} --password {} --pool {} --debug".format(
@@ -52,45 +97,18 @@ def test_skip_kernel_check(shell, convert2rhel):
         c2r.sendcontrol("c")
     assert c2r.exitstatus != 0
 
-    # Clean up
-    if "centos-8" in SYSTEM_RELEASE_ENV:
-        assert shell("mv /tmp/s_backup_eus/* /usr/share/convert2rhel/repos/").returncode == 0
-    assert shell("mv /tmp/s_backup/* /etc/yum.repos.d/").returncode == 0
 
-
-def test_system_not_updated(shell, convert2rhel):
+@pytest.mark.system_not_up_to_date
+def test_system_not_updated(shell, convert2rhel, downgrade_and_versionlock):
     """
     System contains at least one package that is not updated to
     the latest version. The c2r has to display a warning message
-    about that. Also not updated package it's version
+    about that. Also, not updated package its version
     is locked. Display a warning about used version lock.
     """
-    centos_8_pkg_url = "https://vault.centos.org/8.1.1911/BaseOS/x86_64/os/Packages/wpa_supplicant-2.7-1.el8.x86_64.rpm"
-
-    if "centos-8" in SYSTEM_RELEASE_ENV:
-        # The dnf transaction calculation fails if the maximum number of kernels that can be installed has been reached:
-        # "package kernel-4.18.0-348.23.1.el8_5.x86_64 requires kernel-core-uname-r = 4.18.0-348.23.1.el8_5.x86_64,
-        #     but none of the providers can be installed"
-        # To us now the only known solution is to remove the oldest kernel before proceeding.
-        oldest_kernel = shell(
-            "rpm -q --qf '%{BUILDTIME}\t%{EVR}.%{ARCH}\n' kernel | sort -n | head -1 | cut -f2"
-        ).output.strip()
-        assert shell("yum remove -y kernel*{0}".format(oldest_kernel)).returncode == 0
-
-        # Try to downgrade two packages.
-        # On CentOS-8 we cannot do the downgrade as the repos contain only the latest package version.
-        # We need to install package from older repository as a workaround.
-        assert shell("yum install -y {}".format(centos_8_pkg_url)).returncode == 0
-    else:
-        assert shell("yum install openldap wpa_supplicant -y").returncode == 0
-        assert shell("yum downgrade openldap wpa_supplicant -y").returncode == 0
-
-    assert shell("yum install -y yum-plugin-versionlock").returncode == 0
-    assert shell("yum versionlock wpa_supplicant").returncode == 0
-
     # Run utility until the reboot
     with convert2rhel(
-        "-y --no-rpm-va --serverurl {} --username {} --password {} --pool {} --debug".format(
+        "-y --no-rpm-va --serverurl {} --username {} --password {} --pool {} --debug --restart".format(
             env.str("RHSM_SERVER_URL"),
             env.str("RHSM_USERNAME"),
             env.str("RHSM_PASSWORD"),
