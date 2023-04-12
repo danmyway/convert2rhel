@@ -293,7 +293,7 @@ def get_installed_pkgs_w_fingerprints(name=""):
 
 def get_pkg_fingerprint(pkg_obj):
     """Get fingerprint of the key used to sign a package."""
-    pkg_sig = get_pkg_signature_with_cleanup(pkg_obj)
+    pkg_sig = get_pkg_signature(pkg_obj)
     fingerprint_match = re.search("Key ID (.*)", pkg_sig)
     if fingerprint_match:
         return fingerprint_match.group(1)
