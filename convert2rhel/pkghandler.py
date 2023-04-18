@@ -678,7 +678,8 @@ def remove_excluded_pkgs():
     depending on the system to be converted.
     """
     loggerinst.info("Searching for the following excluded packages:\n")
-    remove_pkgs_with_confirm(system_info.excluded_pkgs)
+    pkgs_to_remove = _get_packages_to_remove(system_info.excluded_pkgs)
+    remove_pkgs_with_confirm(pkgs_to_remove)
 
 
 def remove_repofile_pkgs():
@@ -691,13 +692,34 @@ def remove_repofile_pkgs():
     subscription-manager installation.
     """
     loggerinst.info("Searching for packages containing .repo files or affecting variables in the .repo files:\n")
-    remove_pkgs_with_confirm(system_info.repofile_pkgs)
+    pkgs_to_remove = _get_packages_to_remove(system_info.repofile_pkgs)
+    remove_pkgs_with_confirm(pkgs_to_remove)
+
+
+def remove_pkgs_with_confirm(pkgs_to_remove, backup=True):
+    """Remove packages with user confirmation and backup.
+
+    :param pkgs_to_remove: List of packages that will be removed
+    :type pkgs_to_remove: list[PackageInformation]
+    :param backup: If the package should be in a backup. Defaults to True
+    :type backup: bool
+    """
+    if not pkgs_to_remove:
+        loggerinst.info("\nNothing to do.")
+        return
+
+    loggerinst.info("\n")
+    loggerinst.warning("The following packages will be removed...")
+    print_pkg_info(pkgs_to_remove)
+    utils.ask_to_continue()
+    remove_pkgs([get_pkg_nvra(pkg.nevra) for pkg in pkgs_to_remove], backup=backup)
+    loggerinst.debug("Successfully removed %s packages" % str(len(pkgs_to_remove)))
 
 
 @utils.run_as_child_process
-def remove_pkgs_with_confirm(pkgs, backup=True):
+def _get_packages_to_remove(pkgs):
     """
-    Remove selected packages with a breakdown and user confirmation prompt.
+    Get packages information that will be removed.
 
     .. important::
         This function is being executed in a child process to prevent that the
@@ -709,6 +731,9 @@ def remove_pkgs_with_confirm(pkgs, backup=True):
         information with the rpm binary. This YUM API method we use calls
         directly the rpmdb, which in its turn, traps the signal handler and
         prevent the main process to handle the Ctrl + C.
+
+    :param pkgs: List of packages that will be removed
+    :type pkgs: list[PackageInformation]
     """
     pkgs_to_remove = []
     for pkg in pkgs:
@@ -717,15 +742,7 @@ def remove_pkgs_with_confirm(pkgs, backup=True):
         pkgs_to_remove.extend(pkg_objects)
         loggerinst.info("%s %s %s" % (pkg, temp, str(len(pkg_objects))))
 
-    if not pkgs_to_remove:
-        loggerinst.info("\nNothing to do.")
-        return
-    loggerinst.info("\n")
-    loggerinst.warning("The following packages will be removed...")
-    print_pkg_info(pkgs_to_remove)
-    utils.ask_to_continue()
-    remove_pkgs([get_pkg_nvra(pkg.nevra) for pkg in pkgs_to_remove], backup=backup)
-    loggerinst.debug("Successfully removed %s packages" % str(len(pkgs_to_remove)))
+    return pkgs_to_remove
 
 
 def get_system_packages_for_replacement():
@@ -1143,13 +1160,6 @@ def _get_packages_to_update_dnf(reposdir):
     # in repo files. See this bugzilla comment:
     # https://bugzilla.redhat.com/show_bug.cgi?id=1920735#c2
     base.conf.read(priority=pkgmanager.conf.PRIO_MAINCONFIG)
-    loggerinst.info("DEBUGGING FAILURE ------------------------")
-    loggerinst.info("Reposdir: %s", base.conf.reposdir)
-    loggerinst.info("PRIO_MAINCONFIG: %s", pkgmanager.conf.PRIO_MAINCONFIG)
-    loggerinst.info("Install root: %s", base.conf.installroot)
-    loggerinst.info("Varsdir: %s", base.conf.varsdir)
-    loggerinst.info("DEBUGGING FAILURE ------------------------")
-
     base.conf.substitutions.update_from_etc(installroot=base.conf.installroot, varsdir=base.conf.varsdir)
     base.read_all_repos()
     base.fill_sack()
