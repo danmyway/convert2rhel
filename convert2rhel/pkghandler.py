@@ -436,7 +436,7 @@ def _get_installed_pkg_objects_yum(name=None, version=None, release=None, arch=N
     installed_packages = yum_base.rpmdb.returnPackages()
     yum_base.close()
     del yum_base
-    return list(installed_packages)
+    return installed_packages
 
 
 def _get_installed_pkg_objects_dnf(name=None, version=None, release=None, arch=None):
@@ -530,20 +530,17 @@ def print_pkg_info(pkgs):
     """Print package information.
 
     :param pkgs: List of packages to be printed
-    :type pkgs: list
+    :type pkgs: list[PackageInformation] | list[RPMInstalledPackage]
     """
-    max_nvra_length = max(
-        map(len, [get_pkg_nvra(pkg.nevra) if hasattr(pkg, "nevra") else get_pkg_nevra(pkg) for pkg in pkgs])
-    )
-    max_packager_length = max(
-        max(
-            map(
-                len,
-                [get_vendor(pkg) if pkg.vendor != "(none)" else get_packager(pkg) for pkg in pkgs],
-            )
-        ),
-        len("Vendor/Packager"),
-    )
+    # Get package nvra length
+    packages_nvra = [
+        get_pkg_nvra(pkg.nevra) if isinstance(pkg, PackageInformation) else get_pkg_nvra(pkg) for pkg in pkgs
+    ]
+    max_nvra_length = max(map(len, packages_nvra))
+
+    # Get packager length
+    packager_length = [get_vendor(pkg) if pkg.vendor != "(none)" else get_packager(pkg) for pkg in pkgs]
+    max_packager_length = max(max(map(len, packager_length)), len("Vendor/Packager"))
 
     header = (
         "%-*s  %-*s  %s"
@@ -576,7 +573,7 @@ def print_pkg_info(pkgs):
             "%-*s  %-*s  %s"
             % (
                 max_nvra_length,
-                get_pkg_nvra(pkg.nevra) if hasattr(pkg, "nevra") else get_pkg_nevra(pkg),
+                get_pkg_nvra(pkg.nevra) if isinstance(pkg, PackageInformation) else get_pkg_nvra(pkg),
                 max_packager_length,
                 get_vendor(pkg) if pkg.vendor != "(none)" else get_packager(pkg),
                 from_repo,
@@ -591,7 +588,7 @@ def print_pkg_info(pkgs):
 
 def _get_package_repository(pkg):
     """Get package repository information."""
-    package = get_pkg_nevra(pkg.nevra) if hasattr(pkg, "nevra") else get_pkg_nevra(pkg)
+    package = get_pkg_nvra(pkg.nevra) if isinstance(pkg, PackageInformation) else get_pkg_nvra(pkg)
     output, retcode = utils.run_subprocess(
         ["repoquery", "--quiet", "-q", package, "--qf", "%{REPOID}"],
         print_cmd=False,

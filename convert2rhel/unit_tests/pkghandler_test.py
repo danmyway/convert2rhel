@@ -1054,6 +1054,10 @@ PACKAGE_FORMATS = (
     pytest.param(
         "NetworkManager-1.18.8-2.0.1.el7_9", ("NetworkManager", None, "1.18.8", "2.0.1.el7_9", None), id="NVR"
     ),
+    pytest.param(
+        "bind-export-libs-32:9.11.4-26.P2.el7_9.13.x86_64",
+        ("bind-export-libs", "32", "9.11.4", "26.P2.el7_9.13", "x86_64"),
+    ),
 )
 
 
