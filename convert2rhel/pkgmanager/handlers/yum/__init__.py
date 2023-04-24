@@ -136,6 +136,7 @@ class YumTransactionHandler(TransactionHandlerBase):
             for repo in enabled_repos:
                 self._base.repos.enableRepo(repo)
         except pkgmanager.Errors.RepoError as e:
+            loggerinst.debug("Raising pkgmanager.Errors.RepoError")
             loggerinst.debug("Loading repository metadata failed: %s" % e)
             loggerinst.critical("Failed to populate repository metadata.")
 

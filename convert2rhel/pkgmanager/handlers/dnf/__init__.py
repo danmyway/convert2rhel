@@ -101,6 +101,7 @@ class DnfTransactionHandler(TransactionHandlerBase):
             # Load metadata of the enabled repositories
             self._base.fill_sack()
         except pkgmanager.exceptions.RepoError as e:
+            loggerinst.debug("Raising pkgmanager.exceptions.RepoError")
             loggerinst.debug("Loading repository metadata failed: %s" % e)
             loggerinst.critical("Failed to populate repository metadata.")
 

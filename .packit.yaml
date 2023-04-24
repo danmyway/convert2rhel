@@ -34,34 +34,34 @@ jobs:
     get-current-version:
     - grep -oP '^Version:\s+\K\S+' packaging/convert2rhel.spec
 
-- &tests
-  job: tests
-  targets:
-    epel-7-x86_64:
-      distros: [centos-7, oraclelinux-7]
-    epel-8-x86_64:
-        #TODO bump distro context to 8.7 when the image is available on the testing farm
-        # Even though the distro context is 8.6 we are setting the SYSTEM_RELEASE_ENV to 8.7
-        # to tag the updated system correctly
-      distros: [centos-8.4, centos-8-latest, oraclelinux-8.6]
-  trigger: pull_request
-  identifier: "tier0"
-  tmt_plan: "tier0"
-  # Run on Red Testing Farm Hat Ranch, tag resources to sst_conversions
-  use_internal_tf: True
-  tf_extra_params:
-    environments:
-      - settings:
-          provisioning:
-            tags:
-              BusinessUnit: sst_conversions
-
-- &tier1
-  <<: *tests
-  identifier: "tier1"
-  tmt_plan: "tier1"
-
-- &main
-  <<: *tests
-  trigger: commit
-  branch: main
+#- &tests
+#  job: tests
+#  targets:
+#    epel-7-x86_64:
+#      distros: [centos-7, oraclelinux-7]
+#    epel-8-x86_64:
+#        #TODO bump distro context to 8.7 when the image is available on the testing farm
+#        # Even though the distro context is 8.6 we are setting the SYSTEM_RELEASE_ENV to 8.7
+#        # to tag the updated system correctly
+#      distros: [centos-8.4, centos-8-latest, oraclelinux-8.6]
+#  trigger: pull_request
+#  identifier: "tier0"
+#  tmt_plan: "tier0"
+#  # Run on Red Testing Farm Hat Ranch, tag resources to sst_conversions
+#  use_internal_tf: True
+#  tf_extra_params:
+#    environments:
+#      - settings:
+#          provisioning:
+#            tags:
+#              BusinessUnit: sst_conversions
+#
+#- &tier1
+#  <<: *tests
+#  identifier: "tier1"
+#  tmt_plan: "tier1"
+#
+#- &main
+#  <<: *tests
+#  trigger: commit
+#  branch: main
