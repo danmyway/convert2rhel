@@ -253,7 +253,6 @@ class TestSubscription(unittest.TestCase):
         def __call__(self, msg):
             self.msg += "%s\n" % msg
 
-
     @unit_tests.mock(logging.Logger, "info", LogMocked())
     @unit_tests.mock(logging.Logger, "warning", LogMocked())
     @unit_tests.mock(utils, "ask_to_continue", PromptUserMocked())
