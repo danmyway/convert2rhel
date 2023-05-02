@@ -223,17 +223,17 @@ class TestSubscription(unittest.TestCase):
     @unit_tests.mock(subscription, "get_avail_repos", lambda: ["rhel_x", "rhel_y"])
     def test_check_needed_repos_availability(self):
         subscription.check_needed_repos_availability(["rhel_x"])
-        self.assertTrue("Needed RHEL repositories are available." in logging.Logger.info.msg)
+        self.assertIn("Needed RHEL repositories are available.", logging.Logger.info.msg)
 
         subscription.check_needed_repos_availability(["rhel_z"])
-        self.assertTrue("rhel_z repository is not available" in logging.Logger.warning.msg)
+        self.assertIn("rhel_z repository is not available", logging.Logger.warning.msg)
 
     @unit_tests.mock(logging.Logger, "warning", LogMocked())
     @unit_tests.mock(utils, "ask_to_continue", PromptUserMocked())
     @unit_tests.mock(subscription, "get_avail_repos", lambda: [])
     def test_check_needed_repos_availability_no_repo_available(self):
         subscription.check_needed_repos_availability(["rhel"])
-        self.assertTrue("rhel repository is not available" in logging.Logger.warning.msg)
+        self.assertIn("rhel repository is not available", logging.Logger.warning.msg)
 
     @unit_tests.mock(pkghandler, "get_installed_pkg_objects", lambda _: [namedtuple("Pkg", ["name"])("submgr")])
     @unit_tests.mock(pkghandler, "print_pkg_info", lambda x: None)
@@ -264,9 +264,7 @@ class TestSubscription(unittest.TestCase):
         subscription.remove_original_subscription_manager()
 
         self.assertEqual(len(subscription.loggerinst.info_msgs), 2)
-        self.assertTrue(
-            "No packages related to subscription-manager installed." in subscription.loggerinst.info_msgs[-1]
-        )
+        self.assertIn("No packages related to subscription-manager installed.", subscription.loggerinst.info_msgs[-1])
 
 
 @pytest.fixture
@@ -503,36 +501,20 @@ class TestRegisterSystem(object):
         assert len(mocked_rhsm_call_blocking.call_args_list) == 1
         assert "CRITICAL" not in [rec.levelname for rec in caplog.records]
 
-    @pytest.mark.parametrize(
-        ("rhel_major_version", "expected_message"),
-        (
-            (6, "Skipping RHSM service shutdown on CentOS Linux 6."),
-            (7, "RHSM service stopped."),
-        ),
-    )
-    def test_stop_rhsm(self, caplog, monkeypatch, global_system_info, rhel_major_version, expected_message):
+    def test_stop_rhsm(self, caplog, monkeypatch, global_system_info):
         monkeypatch.setattr(subscription, "system_info", global_system_info)
-        global_system_info.version = Version(rhel_major_version, 10)
+        global_system_info.version = Version(7, 9)
         global_system_info.name = "CentOS Linux"
 
         run_subprocess_mock = mock.Mock(return_value=("Success", 0))
         monkeypatch.setattr(utils, "run_subprocess", run_subprocess_mock)
 
         assert subscription._stop_rhsm() is None
-        assert caplog.records[-1].message == expected_message
+        assert caplog.records[-1].message == "RHSM service stopped."
 
-    @pytest.mark.parametrize(
-        "rhel_major_version",
-        (
-            # 6 currently doesn't stop rhsm-service.  Revisit if we get host
-            # already registered errors
-            # 6,
-            7,
-        ),
-    )
-    def test_stop_rhsm_failure(self, caplog, monkeypatch, global_system_info, rhel_major_version):
+    def test_stop_rhsm_failure(self, caplog, monkeypatch, global_system_info):
         monkeypatch.setattr(subscription, "system_info", global_system_info)
-        global_system_info.version = Version(rhel_major_version, 10)
+        global_system_info.version = Version(7, 9)
 
         run_subprocess_mock = mock.Mock(return_value=("Failure", 1))
         monkeypatch.setattr(utils, "run_subprocess", run_subprocess_mock)
@@ -624,7 +606,7 @@ class TestRegistrationCommand(object):
     def test_instantiate_failures(self, registration_kwargs, error_message):
         """Test various failures instantiating RegistrationCommand."""
         with pytest.raises(ValueError, match=error_message):
-            cmd = subscription.RegistrationCommand(**registration_kwargs)
+            subscription.RegistrationCommand(**registration_kwargs)
 
     @pytest.mark.parametrize(
         "registration_kwargs",
@@ -781,7 +763,7 @@ class TestRegistrationCommand(object):
                 None,
                 "RegisterWithActivationKeys",
                 "sasa{sv}a{sv}s",
-                "Organization: Local Organization",
+                "Organization: *****",
             ),
             (
                 "Local Organization",
@@ -790,7 +772,7 @@ class TestRegistrationCommand(object):
                 "pass_word",
                 "Register",
                 "sssa{sv}a{sv}s",
-                "Organization: Local Organization",
+                "Organization: *****",
             ),
             (None, None, "user_name", "pass_word", "Register", "sssa{sv}a{sv}s", None),
         ),
@@ -1021,17 +1003,6 @@ class TestDownloadRHSMPkgs(object):
             "pkgs_to_download",
         ),
         (
-            (
-                (6, 0),
-                False,
-                frozenset(
-                    (
-                        "subscription-manager",
-                        "subscription-manager-rhsm-certificates",
-                        "subscription-manager-rhsm",
-                    )
-                ),
-            ),
             (
                 (7, 0),
                 False,
@@ -1517,6 +1488,15 @@ def test_update_rhsm_custom_facts_no_rhsm(global_tool_opts, caplog, monkeypatch)
 
     subscription.update_rhsm_custom_facts()
     assert "Skipping updating RHSM custom facts." in caplog.records[-1].message
+
+
+def test_update_rhsm_custom_facts_disable_telemetry(monkeypatch, caplog):
+    message = "Telemetry disabled, skipping RHSM facts upload."
+    monkeypatch.setenv("CONVERT2RHEL_DISABLE_TELEMETRY", "1")
+
+    subscription.update_rhsm_custom_facts()
+
+    assert message in caplog.records[-1].message
 
 
 MOCK_LIST_AVAILABLE_SUBS_OUTPUT = """\

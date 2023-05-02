@@ -1,16 +1,15 @@
-import platform
 import re
 
 from collections import namedtuple
+
+from conftest import SYSTEM_RELEASE_ENV
 
 
 def get_system_version(system_release_content=None):
     """Return a namedtuple with major and minor elements, both of an int type.
 
     Examples:
-    Oracle Linux Server release 6.10
     Oracle Linux Server release 7.8
-    CentOS release 6.10 (Final)
     CentOS Linux release 7.6.1810 (Core)
     CentOS Linux release 8.1.1911 (Core)
     """
@@ -29,8 +28,8 @@ def test_install_dependency_packages(shell):
     """
 
     with open("/etc/system-release", "r") as file:
-        system_release = file.read()
-        system_version = get_system_version(system_release_content=system_release)
+        system_rls = file.read()
+        system_version = get_system_version(system_release_content=system_rls)
         if system_version.major == 7:
             dependency_pkgs = [
                 "abrt-retrace-client",  # OAMG-4447
@@ -44,7 +43,7 @@ def test_install_dependency_packages(shell):
                 "python-requests",  # OAMG-4936
             ]
         elif system_version.major == 8:
-            if "oracle-8" in platform.platform():
+            if "oracle-8" in SYSTEM_RELEASE_ENV:
                 dependency_pkgs = [
                     "iwl7260-firmware",  # RHELC-567
                     "iwlax2xx-firmware",  # RHELC-567 - causing problems during the conversion on OL8

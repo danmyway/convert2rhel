@@ -5,9 +5,54 @@ description: |
     the "Red Hat Enterprise Linux" string.
 
 tier: 1
-test: pytest -svv
+
+tag+:
+    - checks-after-conversion
 
 link:
   - https://issues.redhat.com/browse/RHELC-664
   - https://issues.redhat.com/browse/RHELC-411
   - https://issues.redhat.com/browse/RHELC-291
+
+/disable_data_collection:
+    tag: CONVERT2RHEL_DISABLE_TELEMETRY
+    test: pytest -svv -m disable_data_collection
+
+/delete_temporary_folder:
+    test: pytest -svv -m delete_temporary_folder
+
+/enabled_repositories:
+    test: pytest -svv -m enabled_repositories
+
+/flag_system_as_converted:
+    test: pytest -svv -m flag_system_as_converted
+
+/basic_conversion:
+    test: pytest -svv -m basic_conversion
+
+/correct_distro:
+    test: pytest -svv -m correct_distro
+
+/rhel_kernel:
+    test: pytest -svv -m rhel_kernel
+
+/yum_check:
+    test: pytest -svv -m yum_check
+
+/verify_string_in_log:
+    tag+:
+        - verify-string-in-log
+    /initramfs_and_vmlinuz_present:
+        tag+:
+            - initramfs-and-vmlinuz-present
+        test: pytest -svv -m initramfs_and_vmlinuz_present
+
+/log_lines_not_duplicated:
+    summary+: Logged lines are not duplicated
+    # TODO (danmyway) remove when the duplication of lines with multiple packages with different versions gets resolved
+    result: info
+    description+: |
+        Iterate over the log file and check that the lines are unique and not duplicated.
+    tag+:
+        - log-file
+    test: pytest -svv -m verify_logging_is_not_duplicated

@@ -1,4 +1,8 @@
-def test_one_kernel_scenario(shell):
+import pytest
+
+
+@pytest.mark.rhel_kernel
+def test_rhel_kernel(shell):
     # Check if kernel is RHEL one
     kernel = shell("rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{VENDOR}\n' kernel").output
     assert "Red Hat" in kernel

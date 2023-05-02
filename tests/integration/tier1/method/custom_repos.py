@@ -2,13 +2,13 @@ import re
 
 from collections import namedtuple
 
+import pytest
+
 
 def get_system_version(system_release_content=None):
     """Return a namedtuple with major and minor elements, both of an int type.
     Examples:
-    Oracle Linux Server release 6.10
     Oracle Linux Server release 7.8
-    CentOS release 6.10 (Final)
     CentOS Linux release 7.6.1810 (Core)
     CentOS Linux release 8.1.1911 (Core)
     """
@@ -20,6 +20,7 @@ def get_system_version(system_release_content=None):
     return version
 
 
+@pytest.mark.custom_repos_conversion
 def test_run_conversion_using_custom_repos(shell, convert2rhel):
 
     # We need to skip check for collected rhsm custom facts after the conversion

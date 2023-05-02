@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -30,6 +31,8 @@ SATELLITE_URL = "satellite.sat.engineering.redhat.com"
 SATELLITE_PKG_URL = "https://satellite.sat.engineering.redhat.com/pub/katello-ca-consumer-latest.noarch.rpm"
 SATELLITE_PKG_DST = "/usr/share/convert2rhel/subscription-manager/katello-ca-consumer-latest.noarch.rpm"
 
+SYSTEM_RELEASE_ENV = os.environ["SYSTEM_RELEASE_ENV"]
+
 
 @pytest.fixture()
 def shell(tmp_path):
@@ -53,9 +56,9 @@ def shell(tmp_path):
 
 @pytest.fixture()
 def convert2rhel(shell):
-    """Context manager to run convert2rhel utility.
+    """Context manager to run Convert2RHEL utility.
 
-    This fixture runs the convert2rhel with the specified options and
+    This fixture runs the Convert2RHEL with the specified options and
     do automatic teardown for you. It yields pexpext.spawn object.
 
     You can verify that some text is in stdout, by using:
@@ -158,7 +161,7 @@ class OsRelease:
                 try:
                     param, value = line.strip().split("=")
                 except ValueError:
-                    # we're skipping lines which can't be splitted based on =
+                    # we're skipping lines which can't be split based on =
                     pass
                 else:
                     if param.lower() in cls.__annotations__:
@@ -175,7 +178,7 @@ class ConfigUtils:
     """Convenient features to work with configs (or any other text files).
 
     Created specifically to simplify writing integration tests, which requires
-    adusting some configs.
+    adjusting some configs.
     """
 
     def __init__(self, config_path: Path):
@@ -214,7 +217,7 @@ class ConfigUtils:
 
 @pytest.fixture()
 def c2r_config(os_release):
-    """ConfigUtils object with already loaded convert2rhel config."""
+    """ConfigUtils object with already loaded Convert2RHEL config."""
     release_id2conf = {"centos": "centos", "ol": "oracle"}
     config_path = (
         Path("/usr/share/convert2rhel/configs/")
@@ -225,11 +228,14 @@ def c2r_config(os_release):
 
 
 @pytest.fixture
-def get_system_release(shell):
+def system_release(shell):
     """
     This fixture returns a string of ID and VERSION_ID from /etc/os-release.
     If /etc/os-release is not available, /etc/system-release is read instead.
     These could be in generally used for OS specific conditioning.
+    To be used whenever we need live information about system release.
+    E.g. after conversion system release check.
+    Otherwise, use hardcoded SYSTEM_RELEASE_ENV envar from /plans/main.fmf
     Mapping of OS to ID:
         {
             "Centos Linux": "centos",\n
@@ -288,3 +294,38 @@ def config_at():
         return ConfigUtils(path)
 
     return factory
+
+
+@pytest.fixture()
+def log_file_data():
+    """
+    This fixture reads and returns data from the convert2rhel.log file.
+    Mainly used for after conversion checks, where we match required strings to the log output.
+    """
+    convert2rhel_log_file = "/var/log/convert2rhel/convert2rhel.log"
+
+    with open(convert2rhel_log_file, "r") as logfile:
+        log_data = logfile.read()
+
+        return log_data
+
+
+@pytest.fixture(scope="function")
+def required_packages(shell):
+    """
+    Installs packages based on values under TEST_REQUIRES envar in tmt metadata, when called.
+    """
+    try:
+        required_packages = os.environ.get("TEST_REQUIRES").split(" ")
+        for package in required_packages:
+            print(f"\nPREPARE: Installing required {package}")
+            assert shell(f"yum install -y {package}")
+
+        yield
+
+        for package in required_packages:
+            print(f"\nCLEANUP: Removing previously installed required {package}")
+            assert shell(f"yum remove -y *{package}*")
+
+    except KeyError:
+        raise

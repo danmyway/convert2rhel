@@ -38,6 +38,9 @@ from convert2rhel import i18n
 
 loggerinst = logging.getLogger(__name__)
 
+# A string we're using to replace sensitive information (like an RHSM password) in logs, terminal output, etc.
+OBFUSCATION_STRING = "*" * 5
+
 
 class ImportGPGKeyError(Exception):
     """Raised for failures during the rpm import of gpg keys."""
@@ -155,8 +158,7 @@ def run_subprocess(cmd, print_cmd=True, print_output=True):
         if print_output:
             loggerinst.info(line.rstrip("\n"))
 
-    # Call communicate() to wait for the process to terminate so that we can get the return code by poll().
-    # It's just for py2.6, py2.7+/3 doesn't need this.
+    # Call communicate() to wait for the process to terminate so that we can get the return code by poll()
     process.communicate()
 
     return_code = process.poll()
@@ -545,8 +547,7 @@ def get_rpm_path_from_yumdownloader_output(cmd, output, dest):
     """Parse the output of yumdownloader to get the filepath of the downloaded rpm.
 
     The name of the downloaded rpm is on the last line of the output from yumdownloader. The line can look like:
-      RHEL 6 & 7 & 8: "vim-enhanced-8.0.1763-13.0.1.el8.x86_64.rpm     2.2 MB/s | 1.4 MB     00:00"
-      RHEL 6: "/var/lib/convert2rhel/yum-plugin-ulninfo-0.2-13.el6.noarch.rpm already exists and appears to be complete"
+      RHEL 7 & 8: "vim-enhanced-8.0.1763-13.0.1.el8.x86_64.rpm     2.2 MB/s | 1.4 MB     00:00"
       RHEL 7: "using local copy of 7:oraclelinux-release-7.9-1.0.9.el7.x86_64"
       RHEL 8: "[SKIPPED] oraclelinux-release-8.2-1.0.8.el8.x86_64.rpm: Already downloaded"
     """
@@ -677,27 +678,6 @@ def find_keyid(keyfile):
     return keyid.lower()
 
 
-def string_to_version(verstring):
-    """Return a tuple of (epoch, version, release) from a version string
-    This function was taken from softwarefactory-project/rdopkg
-    (https://github.com/softwarefactory-project/rdopkg/blob/1.4.0/rdopkg/utils/specfile.py)
-    """
-
-    # is there an epoch?
-    components = verstring.split(":")
-    if len(components) > 1:
-        epoch = components[0]
-        components.pop(0)
-    else:
-        epoch = "0"
-
-    remaining = components[:2][0].split("-")
-    version = remaining[0]
-    release = remaining[1]
-
-    return (epoch, version, release)
-
-
 def remove_orphan_folders():
     """Even after removing redhat-release-* package, some of its folders are
     still present, are empty, and that blocks us from installing centos-release
@@ -716,44 +696,50 @@ def remove_orphan_folders():
             os.rmdir(path)
 
 
-def hide_secrets(args, secret_args=frozenset(("--password", "--activationkey", "--token", "-p", "-k"))):
+def hide_secrets(
+    args, secret_options=frozenset(("--username", "--password", "--activationkey", "--org", "-u", "-p", "-k", "-o"))
+):
     """
-    Replace secret values with asterisks.
+    Replace secret values passed through a command line with asterisks.
 
-    This function takes a list of arguments which will be passed
-    in a transformation process where we will replace any secret values
-    with an fixed size of asterisks (*) and returns a new list containing
-     the arguments with this transformation.
+    This function takes a list of command line arguments and returns a new list containing where any secret value is
+    replaced with a fixed size of asterisks (*).
 
-    :arg args: An argument list which may contain secret values.
+    Terminology:
+     - an argument is one of whitespace delimited strings of an executed cli command
+       Example: `ls -a -w 10 dir` ... four arguments (-a, -w, 10, dir)
+     - an option is a subset of arguments that start with - or -- and modify the behavior of a cli command
+       Example: `ls -a -w 10 dir` ... two options (-a, -w)
+     - an option parameter is the argument following an option if the option requires a value
+       Example: `ls -a -w 10 dir` ... one option parameter (10)
+
+    :param: args: A list of command line arguments which may contain secret values.
+    :param: secret_options: A set of command line options requiring sensitive or private information.
     :returns: A new list of arguments with secret values hidden.
     """
-    obfuscation_string = "*" * 5
-
     sanitized_list = []
     hide_next = False
     for arg in args:
         if hide_next:
-            # Second part of a two part secret argument (like --password *SECRET*)
-            arg = obfuscation_string
+            # This is a parameter of a secret option
+            arg = OBFUSCATION_STRING
             hide_next = False
 
-        elif arg in secret_args:
-            # First part of a two part secret argument (like *--password* SECRET)
+        elif arg in secret_options:
+            # This is a secret option => mark its parameter (the following argument) to be obfuscated
             hide_next = True
 
         else:
-            # A secret argument in one part (like --password=SECRET)
-            for problem_arg in secret_args:
-                if arg.startswith(problem_arg + "="):
-                    arg = "{0}={1}".format(problem_arg, obfuscation_string)
+            # Handle the case where the secret option and its parameter are both in one argument ("--password=SECRET")
+            for option in secret_options:
+                if arg.startswith(option + "="):
+                    arg = "{0}={1}".format(option, OBFUSCATION_STRING)
 
         sanitized_list.append(arg)
 
     if hide_next:
         loggerinst.debug(
-            "Passed arguments had unexpected secret argument,"
-            " '{0}', without a secret".format(sanitized_list[-1])  # lgtm[py/clear-text-logging-sensitive-data]
+            "Passed arguments had an option, '{0}', without an expected secret parameter".format(sanitized_list[-1])
         )
 
     return sanitized_list

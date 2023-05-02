@@ -26,7 +26,6 @@ from collections import namedtuple
 import pytest
 import six
 
-import convert2rhel.toolopts
 import convert2rhel.utils
 
 from convert2rhel.toolopts import tool_opts
@@ -92,9 +91,9 @@ class TestTooloptsParseFromCLI(object):
     def test_no_serverurl(self, monkeypatch, global_tool_opts):
         monkeypatch.setattr(sys, "argv", mock_cli_arguments([]))
         convert2rhel.toolopts.CLI()
-        assert global_tool_opts.rhsm_hostname == None
-        assert global_tool_opts.rhsm_port == None
-        assert global_tool_opts.rhsm_prefix == None
+        assert global_tool_opts.rhsm_hostname is None
+        assert global_tool_opts.rhsm_port is None
+        assert global_tool_opts.rhsm_prefix is None
 
     @pytest.mark.parametrize(
         "serverurl",
@@ -200,7 +199,7 @@ def test_both_disable_submgr_and_no_rhsm_options_work(argv, raise_exception, no_
     ("argv", "content", "output", "message"),
     (
         (
-            mock_cli_arguments([""]),
+            mock_cli_arguments([]),
             "[subscription_manager]\npassword=conf_pass",
             {"password": "conf_pass", "activation_key": None},
             None,
@@ -479,17 +478,17 @@ def test_validate_serverurl_parsing(url_parts, message):
 def test__log_command_used(caplog, monkeypatch):
     obfuscation_string = "*" * 5
     input_command = mock_cli_arguments(
-        ["--username", "uname", "--password", "123", "--activationkey", "456", "--token", "789"]
+        ["--username", "uname", "--password", "123", "--activationkey", "456", "--org", "789"]
     )
     expected_command = mock_cli_arguments(
         [
             "--username",
-            "uname",
+            obfuscation_string,
             "--password",
             obfuscation_string,
             "--activationkey",
             obfuscation_string,
-            "--token",
+            "--org",
             obfuscation_string,
         ]
     )
@@ -503,7 +502,7 @@ def test__log_command_used(caplog, monkeypatch):
     ("argv", "message"),
     (
         # The message is a log of used command
-        (mock_cli_arguments(["-o", "org", "-k", "key"]), "-o org -k *****"),
+        (mock_cli_arguments(["-o", "org", "-k", "key"]), "-o ***** -k *****"),
         (
             mock_cli_arguments(["-o", "org"]),
             "Either the --organization or the --activationkey option is missing. You can't use one without the other.",

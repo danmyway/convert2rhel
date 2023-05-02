@@ -113,8 +113,7 @@ def get_pytest_marker(request, mark_name):
     """
     Get a pytest mark from a request.
 
-    The pytest API to retrieve a mark changed between RHEL6 and RHEL7.  This function is
-    a compatibility shim to retrieve the value.
+    The pytest API to retrieve a mark. This function is a compatibility shim to retrieve the value.
 
     Use this function instead of pytest's `request.node.get_closest_marker(mark_name)` so that it will work on all versions of RHEL that we are targeting.
     .. seealso::
@@ -273,7 +272,6 @@ def run_subprocess_side_effect(*stubs):
     >>>         (("repoquery", "-l"), (REPOQUERY_L_STUB_GOOD, 0)),
     >>>     )
     >>> )
-
     """
 
     def factory(*args, **kwargs):

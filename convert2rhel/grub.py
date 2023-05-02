@@ -151,16 +151,26 @@ def _get_blk_device(device):
 
 
 def _get_device_number(device):
-    """Return dict with 'major' and 'minor' number of the specified device/partition."""
-    output, ecode = utils.run_subprocess(["lsblk", "-spnlo", "MAJ:MIN", device], print_output=False)
+    """Get the partition number of a particular device.
+
+    This method will use `blkid` to determinate what is the partition number
+    related to a particular device.
+
+    :param device: The device to be analyzed.
+    :type device: str
+    :return: The device partition number.
+    :rtype: int
+    """
+    output, ecode = utils.run_subprocess(
+        ["/usr/sbin/blkid", "-p", "-s", "PART_ENTRY_NUMBER", device], print_output=False
+    )
     if ecode:
-        logger.debug("lsblk output:\n-----\n%s\n-----" % output)
+        logger.debug("blkid output:\n-----\n%s\n-----" % output)
         raise BootloaderError("Unable to get information about the '%s' device" % device)
-    # for partitions the output contains multiple lines (for the partition
-    # and all parents till the devices itself). We want maj:min number just
-    # for the specified device/partition, so take the first line only
-    majmin = output.splitlines()[0].strip().split(":")
-    return {"major": int(majmin[0]), "minor": int(majmin[1])}
+    # We are spliting the partition entry number, and we are just taking that
+    # output as our desired partition number
+    partition_number = output.split("PART_ENTRY_NUMBER=")[-1].replace('"', "")
+    return int(partition_number)
 
 
 def get_grub_device():
@@ -414,7 +424,7 @@ def _add_rhel_boot_entry(efibootinfo_orig):
         "--disk",
         blk_dev,
         "--part",
-        str(dev_number["minor"]),
+        str(dev_number),
         "--loader",
         efi_path,
         "--label",
@@ -581,27 +591,35 @@ def post_ponr_set_efi_configuration():
         _log_critical_error(e.message)
 
 
+def get_grub_config_file():
+    """Get the grub config file path.
+
+    This method will return the grub config file, depending if it is BIOS or
+    UEFI, the method will handle that automatically.
+
+    :return: The path to the grub config file.
+    :rtype: str
+    """
+    grub_config_path = GRUB2_BIOS_CONFIG_FILE
+
+    if is_efi():
+        grub_config_path = os.path.join(RHEL_EFIDIR_CANONICAL_PATH, "grub.cfg")
+
+    return grub_config_path
+
+
 def update_grub_after_conversion():
     """Update GRUB2 images and config after conversion.
 
     This is mainly a protective measure to prevent issues in case the original distribution GRUB2 tooling
     generates images that expect different format of a config file. To be on the safe side we
     rather re-generate the GRUB2 config file and install the GRUB2 image.
-    We opted for doing that only for GRUB2 and not for GRUB Legacy intentionally for the reason of
-    RHEL 6 having transitioned to the Extended Life-cycle Support phase.
     """
-
-    if systeminfo.system_info.version.major == 6:
-        logger.warning(
-            "Convert2RHEL does not install updated GRUB Legacy bootloader image on RHEL 6. Install the image manually "
-            "by following https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/sect-grub-installing."
-        )
-        return
 
     backup.RestorableFile(GRUB2_BIOS_CONFIG_FILE).backup()
     backup.RestorableFile(GRUB2_BIOS_ENV_FILE).backup()
 
-    grub2_config_file = GRUB2_BIOS_CONFIG_FILE if not is_efi() else os.path.join(RHEL_EFIDIR_CANONICAL_PATH, "grub.cfg")
+    grub2_config_file = get_grub_config_file()
 
     output, ret_code = utils.run_subprocess(["/usr/sbin/grub2-mkconfig", "-o", grub2_config_file], print_output=False)
     logger.debug("Output of the grub2-mkconfig call:\n%s" % output)
