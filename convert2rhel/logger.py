@@ -23,7 +23,8 @@ WARNING   (30)    Prints warning message using date/time
 INFO      (20)    Prints info message (no date/time, just plain message)
 TASK      (15)    CUSTOM LABEL - Prints a task header message (using asterisks)
 DEBUG     (10)    Prints debug message (using date/time)
-FILE      (5)     CUSTOM LABEL - Prints only to file handler (using date/time)
+FILE      (5)     CUSTOM LABEL - Outputs with the DEBUG label but only to a file
+                  handle (using date/time)
 """
 import logging
 import os
@@ -36,45 +37,6 @@ from time import gmtime, strftime
 LOG_DIR = "/var/log/convert2rhel"
 
 
-#
-# Pre-dbus import initialization
-#
-
-# We need to initialize the root logger with the NullHandler before dbus is imported.
-# Otherwise, dbus will install Handlers on the root logger which can end up printing
-# our log messages an additional time.  Additionally, bad user data could end up
-# causing the dbus logging to log rhsm passwords and other credentials.
-#
-# Right now we do this here, at the toplevel of logger.py.  In the future we should
-# have a dedicated module for initializing convert2rhel prior to importing other
-# libraries and we can do this step there.
-
-if hasattr(logging, "NullHandler"):
-    NullHandler = logging.NullHandler
-else:
-    # Python 2.6 compatibility.
-    # This code is copied from Pthon-3.10's logging module,
-    # licensed under the Python Software Foundation License, version 2
-    class NullHandler(logging.Handler):
-        def handle(self, record):
-            """Stub."""
-
-        def emit(self, record):
-            """Stub."""
-
-        def createLock(self):
-            self.lock = None
-
-        def _at_fork_reinit(self):
-            pass
-
-    # End of PSF Licensed code
-
-logging.getLogger().addHandler(NullHandler())
-
-# End pre-DBus initialization code
-
-
 class LogLevelTask(object):
     level = 15
     label = "TASK"
@@ -82,7 +44,9 @@ class LogLevelTask(object):
 
 class LogLevelFile(object):
     level = 5
-    label = "FILE"
+    # Label messages DEBUG as it is contains the same messages as debug, just that they always go
+    # to the log file.
+    label = "DEBUG"
 
 
 def setup_logger_handler(log_name, log_dir):

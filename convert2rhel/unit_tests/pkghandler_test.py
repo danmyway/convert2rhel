@@ -34,8 +34,8 @@ from convert2rhel.pkghandler import (
 )
 from convert2rhel.systeminfo import system_info
 from convert2rhel.toolopts import tool_opts
-from convert2rhel.unit_tests import GetLoggerMocked, is_rpm_based_os, run_subprocess_side_effect
-from convert2rhel.unit_tests.conftest import TestPkgObj, all_systems, centos7, centos8, create_pkg_obj
+from convert2rhel.unit_tests import GetLoggerMocked, is_rpm_based_os
+from convert2rhel.unit_tests.conftest import TestPkgObj, all_systems, centos8, create_pkg_obj
 
 
 six.add_move(six.MovedModule("mock", "mock", "unittest.mock"))
@@ -204,7 +204,7 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
     @unit_tests.mock(os.path, "isfile", IsFileMocked(is_file=False))
     @unit_tests.mock(os.path, "getsize", GetSizeMocked(file_size=0))
     def test_clear_versionlock_plugin_not_enabled(self):
-        self.assertFalse(pkghandler.clear_versionlock())
+        pkghandler.clear_versionlock()
         self.assertEqual(len(pkghandler.loggerinst.info_msgs), 1)
         self.assertEqual(
             pkghandler.loggerinst.info_msgs,
@@ -255,22 +255,6 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
         pkghandler.call_yum_cmd("install", set_releasever=False)
 
         self.assertEqual(utils.run_subprocess.cmd, ["yum", "install", "-y"])
-
-    @pytest.mark.skipif(
-        not is_rpm_based_os(),
-        reason="Current test runs only on rpm based systems.",
-    )
-    @unit_tests.mock(pkghandler, "call_yum_cmd", CallYumCmdMocked())
-    def test_call_yum_cmd_w_downgrades_continuous_fail(self):
-        pkghandler.call_yum_cmd.return_code = 1
-
-        self.assertRaises(
-            SystemExit,
-            pkghandler.call_yum_cmd_w_downgrades,
-            "test_cmd",
-            ["pkg"],
-        )
-        self.assertEqual(pkghandler.call_yum_cmd.called, pkghandler.MAX_YUM_CMD_CALLS)
 
     @unit_tests.mock(system_info, "version", namedtuple("Version", ["major", "minor"])(7, 0))
     @unit_tests.mock(system_info, "releasever", None)
@@ -333,45 +317,6 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
                 "pkg",
             ],
         )
-
-    @unit_tests.mock(system_info, "version", namedtuple("Version", ["major", "minor"])(7, 0))
-    @unit_tests.mock(system_info, "releasever", None)
-    @unit_tests.mock(utils, "run_subprocess", RunSubprocessMocked())
-    def test_call_yum_cmd_w_downgrades_correct_cmd(self):
-        pkghandler.call_yum_cmd_w_downgrades("update", ["pkg1", "pkg2"])
-
-        self.assertEqual(utils.run_subprocess.cmd, ["yum", "update", "-y", "pkg1", "pkg2"])
-
-    @unit_tests.mock(pkghandler, "call_yum_cmd", CallYumCmdMocked())
-    def test_call_yum_cmd_w_downgrades_one_fail(self):
-        pkghandler.call_yum_cmd.fail_once = True
-
-        pkghandler.call_yum_cmd_w_downgrades("test_cmd", ["pkg"])
-
-        self.assertEqual(pkghandler.call_yum_cmd.called, 2)
-
-    @unit_tests.mock(pkghandler, "call_yum_cmd", CallYumCmdMocked())
-    @unit_tests.mock(pkghandler, "get_installed_pkgs_by_fingerprint", lambda _: ["pkg"])
-    @unit_tests.mock(pkghandler, "resolve_dep_errors", lambda output: output)
-    @unit_tests.mock(
-        pkghandler,
-        "get_problematic_pkgs",
-        lambda pkg: {"errors": set([pkg]), "mismatches": set()},
-    )
-    @unit_tests.mock(pkghandler, "remove_pkgs", RemovePkgsMocked())
-    def test_call_yum_cmd_w_downgrades_remove_problematic_pkgs(self):
-        pkghandler.call_yum_cmd.return_code = 1
-        pkghandler.MAX_YUM_CMD_CALLS = 1
-
-        self.assertRaises(
-            SystemExit,
-            pkghandler.call_yum_cmd_w_downgrades,
-            "test_cmd",
-            ["fingerprint"],
-        )
-
-        self.assertIn(pkghandler.call_yum_cmd.return_string, pkghandler.remove_pkgs.pkgs)
-        self.assertEqual(pkghandler.remove_pkgs.critical, False)
 
     def test_get_pkgs_to_distro_sync(self):
         problematic_pkgs = {
@@ -1002,7 +947,7 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
         GetInstalledPkgsWDifferentFingerprintMocked(),
     )
     def test_install_rhel_kernel_already_installed_regexp(self):
-        # RHEL 6 and 7
+        # RHEL 7
         utils.run_subprocess.output = "Package kernel-2.6.32-754.33.1.el6.x86_64 already installed and latest version"
 
         pkghandler.install_rhel_kernel()
@@ -1274,7 +1219,7 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
     def test_list_third_party_pkgs_no_pkgs(self):
         pkghandler.list_third_party_pkgs()
 
-        self.assertTrue("No third party packages installed" in pkghandler.loggerinst.info_msgs[0])
+        self.assertIn("No third party packages installed", pkghandler.loggerinst.info_msgs[0])
 
     @unit_tests.mock(
         pkghandler,
@@ -1288,14 +1233,14 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
         pkghandler.list_third_party_pkgs()
 
         self.assertEqual(len(pkghandler.print_pkg_info.pkgs), 3)
-        self.assertTrue("Only packages signed by" in pkghandler.loggerinst.warning_msgs[0])
+        self.assertIn("Only packages signed by", pkghandler.loggerinst.warning_msgs[0])
 
     @unit_tests.mock(tool_opts, "disablerepo", ["*", "rhel-7-extras-rpm"])
     @unit_tests.mock(tool_opts, "enablerepo", ["rhel-7-extras-rpm"])
     @unit_tests.mock(pkghandler, "loggerinst", GetLoggerMocked())
     def test_is_disable_and_enable_repos_has_same_repo(self):
         pkghandler.has_duplicate_repos_across_disablerepo_enablerepo_options()
-        self.assertTrue("Duplicate repositories were found" in pkghandler.loggerinst.warning_msgs[0])
+        self.assertIn("Duplicate repositories were found", pkghandler.loggerinst.warning_msgs[0])
 
     @unit_tests.mock(tool_opts, "disablerepo", ["*"])
     @unit_tests.mock(tool_opts, "enablerepo", ["rhel-7-extras-rpm"])
@@ -1318,24 +1263,24 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
         pkghandler.fix_default_kernel()
         self.assertTrue(len(pkghandler.logging.getLogger.info_msgs), 1)
         self.assertTrue(len(pkghandler.logging.getLogger.warning_msgs), 1)
-        self.assertTrue(
-            "Detected leftover boot kernel, changing to RHEL kernel" in pkghandler.logging.getLogger.warning_msgs[0]
+        self.assertIn(
+            "Detected leftover boot kernel, changing to RHEL kernel", pkghandler.logging.getLogger.warning_msgs[0]
         )
-        self.assertTrue("/etc/sysconfig/kernel", utils.store_content_to_file.filename)
-        self.assertTrue("DEFAULTKERNEL=kernel" in utils.store_content_to_file.content)
-        self.assertFalse("DEFAULTKERNEL=kernel-uek" in utils.store_content_to_file.content)
-        self.assertFalse("DEFAULTKERNEL=kernel-core" in utils.store_content_to_file.content)
+        self.assertIn("/etc/sysconfig/kernel", utils.store_content_to_file.filename)
+        self.assertIn("DEFAULTKERNEL=kernel", utils.store_content_to_file.content)
+        self.assertNotIn("DEFAULTKERNEL=kernel-uek", utils.store_content_to_file.content)
+        self.assertNotIn("DEFAULTKERNEL=kernel-core", utils.store_content_to_file.content)
 
         system_info.name = "Oracle Linux Server release 8.1"
         system_info.version = namedtuple("Version", ["major", "minor"])(8, 1)
         pkghandler.fix_default_kernel()
         self.assertTrue(len(pkghandler.logging.getLogger.info_msgs), 1)
         self.assertTrue(len(pkghandler.logging.getLogger.warning_msgs), 1)
-        self.assertTrue(
-            "Detected leftover boot kernel, changing to RHEL kernel" in pkghandler.logging.getLogger.warning_msgs[0]
+        self.assertIn(
+            "Detected leftover boot kernel, changing to RHEL kernel", pkghandler.logging.getLogger.warning_msgs[0]
         )
-        self.assertTrue("DEFAULTKERNEL=kernel" in utils.store_content_to_file.content)
-        self.assertFalse("DEFAULTKERNEL=kernel-uek" in utils.store_content_to_file.content)
+        self.assertIn("DEFAULTKERNEL=kernel", utils.store_content_to_file.content)
+        self.assertNotIn("DEFAULTKERNEL=kernel-uek", utils.store_content_to_file.content)
 
     @unit_tests.mock(system_info, "name", "CentOS Plus Linux Server release 7.9")
     @unit_tests.mock(system_info, "arch", "x86_64")
@@ -1352,8 +1297,8 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
         self.assertTrue(len(pkghandler.logging.getLogger.info_msgs), 1)
         self.assertTrue(len(pkghandler.logging.getLogger.warning_msgs), 1)
         self.assertTrue("/etc/sysconfig/kernel", utils.store_content_to_file.filename)
-        self.assertTrue("DEFAULTKERNEL=kernel" in utils.store_content_to_file.content)
-        self.assertFalse("DEFAULTKERNEL=kernel-plus" in utils.store_content_to_file.content)
+        self.assertIn("DEFAULTKERNEL=kernel", utils.store_content_to_file.content)
+        self.assertNotIn("DEFAULTKERNEL=kernel-plus", utils.store_content_to_file.content)
 
     @unit_tests.mock(system_info, "name", "CentOS Plus Linux Server release 7.9")
     @unit_tests.mock(system_info, "arch", "x86_64")
@@ -1369,61 +1314,277 @@ class TestPkgHandler(unit_tests.ExtendedTestCase):
         pkghandler.fix_default_kernel()
         self.assertTrue(len(pkghandler.logging.getLogger.info_msgs), 2)
         self.assertTrue(any("Boot kernel validated." in message for message in pkghandler.logging.getLogger.debug_msgs))
-        self.assertTrue(len(pkghandler.logging.getLogger.warning_msgs) == 0)
-
-
-@pytest.mark.parametrize(
-    ("retcode", "output"),
-    (
-        (
-            1,
-            "Updating Subscription Management repositories.\n"
-            "Repository rhel-8-for-x86_64-baseos-rpms is listed more than once in the configuration\n"
-            "Repository rhel-8-for-x86_64-appstream-rpms is listed more than once in the configuration\n"
-            "Last metadata expiration check: 0:12:45 ago on Wed 01 Sep 2021 01:57:50 PM UTC.\n"
-            "No package vlc installed.\nError: No packages marked for distribution synchronization.\n",
-        ),
-        (
-            0,
-            "Updating Subscription Management repositories.\n"
-            "Repository rhel-8-for-x86_64-baseos-rpms is listed more than once in the configuration\n"
-            "Repository rhel-8-for-x86_64-appstream-rpms is listed more than once in the configuration\n"
-            "Last metadata expiration check: 0:15:23 ago on Mon 06 Sep 2021 08:27:13 AM UTC.\n"
-            "No package cpaste installed.\nDependencies resolved.\nNothing to do.\nComplete!\n",
-        ),
-    ),
-)
-def test_call_yum_cmd_w_downgrades(monkeypatch, retcode, output):
-    monkeypatch.setattr(
-        pkghandler,
-        "call_yum_cmd",
-        value=mock.Mock(return_value=(output, retcode)),
-    )
-    resolve_dep_errors = mock.Mock()
-    monkeypatch.setattr(pkghandler, "resolve_dep_errors", value=resolve_dep_errors)
-    monkeypatch.setattr(pkghandler, "get_problematic_pkgs", value=mock.Mock())
-
-    pkghandler.call_yum_cmd_w_downgrades("anything", ["anything"])
-
-    resolve_dep_errors.assert_not_called()
+        self.assertEqual(len(pkghandler.logging.getLogger.warning_msgs), 0)
 
 
 @pytest.mark.parametrize(
     ("version1", "version2", "expected"),
     (
-        ("123-4.fc35", "123-4.fc35", 0),
-        ("123-5.fc35", "123-4.fc35", 1),
-        ("123-3.fc35", "123-4.fc35", -1),
-        (
-            "4.6~pre16262021g84ef6bd9-3.fc35",
-            "4.6~pre16262021g84ef6bd9-3.fc35",
-            0,
+        pytest.param(
+            "kernel-core-0:4.18.0-240.10.1.el8_3.i86", "kernel-core-0:4.18.0-240.10.1.el8_3.i86", 0, id="NEVRA"
         ),
-        ("2:8.2.3568-1.fc35", "2:8.2.3568-1.fc35", 0),
+        pytest.param("kernel-core-0:123-5.fc35", "kernel-core-0:123-4.fc35", 1, id="NEVR"),
+        pytest.param("kernel-core-123-3.fc35.aarch64", "kernel-core-123-4.fc35.aarch64", -1, id="NVRA"),
+        pytest.param("kernel-3.10.0-1160.83.1.0.1.el7", "kernel-3.10.0-1160.83.1.el7", 1, id="NVR"),
+        pytest.param(
+            "kernel-core-0:4.6~pre16262021g84ef6bd9-3.fc35",
+            "kernel-core-0:4.6~pre16262021g84ef6bd9-3.fc35",
+            0,
+            id="NEVR",
+        ),
+        pytest.param("kernel-core-2:8.2.3568-1.fc35", "kernel-core-2:8.2.3568-1.fc35", 0, id="NEVR"),
+        pytest.param(
+            "1:NetworkManager-1.18.8-2.0.1.el7_9.aarch64", "1:NetworkManager-1.18.8-1.0.1.el7_9.aarch64", 1, id="ENVRA"
+        ),
+        pytest.param("1:NetworkManager-1.18.8-2.0.1.el7_9", "1:NetworkManager-1.18.8-3.0.1.el7_9", -1, id="ENVR"),
+        pytest.param("NetworkManager-1.18.8-2.0.1.el7_9", "1:NetworkManager-2.18.8-3.0.1.el7_9", -1, id="NVR&ENVR"),
+        pytest.param("2:NetworkManager-1.18.8-2.0.1.el7_9", "0:NetworkManager-1.18.8-3.0.1.el7_9", 1, id="ENVR"),
     ),
 )
 def test_compare_package_versions(version1, version2, expected):
     assert pkghandler.compare_package_versions(version1, version2) == expected
+
+
+@pytest.mark.parametrize(
+    ("version1", "version2", "exception_message"),
+    (
+        (
+            "kernel-core-0:390-287.fc36",
+            "kernel-0:390-287.fc36",
+            re.escape(
+                "The package names ('kernel-core' and 'kernel') do not match. Can only compare versions for the same packages."
+            ),
+        ),
+        (
+            "kernel-core-0:390-287.fc36.aarch64",
+            "kernel-core-0:391-287.fc36.i86",
+            re.escape("The arches ('aarch64' and 'i86') do not match. Can only compare versions for the same arches."),
+        ),
+    ),
+)
+def test_compare_package_versions_warnings(version1, version2, exception_message):
+    with pytest.raises(ValueError, match=exception_message):
+        pkghandler.compare_package_versions(version1, version2)
+
+
+PACKAGE_FORMATS = (
+    pytest.param(
+        "kernel-core-0:4.18.0-240.10.1.el8_3.i86", ("kernel-core", "0", "4.18.0", "240.10.1.el8_3", "i86"), id="NEVRA"
+    ),
+    pytest.param(
+        "kernel-core-0:4.18.0-240.10.1.el8_3", ("kernel-core", "0", "4.18.0", "240.10.1.el8_3", None), id="NEVR"
+    ),
+    pytest.param(
+        "1:NetworkManager-1.18.8-2.0.1.el7_9.aarch64",
+        ("NetworkManager", "1", "1.18.8", "2.0.1.el7_9", "aarch64"),
+        id="ENVRA",
+    ),
+    pytest.param(
+        "1:NetworkManager-1.18.8-2.0.1.el7_9", ("NetworkManager", "1", "1.18.8", "2.0.1.el7_9", None), id="ENVR"
+    ),
+    pytest.param(
+        "NetworkManager-1.18.8-2.0.1.el7_9.aarch64",
+        ("NetworkManager", None, "1.18.8", "2.0.1.el7_9", "aarch64"),
+        id="NVRA",
+    ),
+    pytest.param(
+        "NetworkManager-1.18.8-2.0.1.el7_9", ("NetworkManager", None, "1.18.8", "2.0.1.el7_9", None), id="NVR"
+    ),
+)
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "yum", reason="cannot test dnf backend if dnf is not present")
+def test_parse_pkg_string_dnf_called(monkeypatch):
+    package = "kernel-core-0:4.18.0-240.10.1.el8_3.i86"
+    parse_pkg_with_dnf_mock = mock.Mock(return_value=("kernel-core", "0", "4.18.0", "240.10.1.el8_3", "i86"))
+    monkeypatch.setattr(pkghandler, "_parse_pkg_with_dnf", value=parse_pkg_with_dnf_mock)
+    pkghandler.parse_pkg_string(package)
+    parse_pkg_with_dnf_mock.assert_called_once()
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "dnf", reason="cannot test yum backend if yum is not present")
+def test_parse_pkg_string_yum_called(monkeypatch):
+    package = "kernel-core-0:4.18.0-240.10.1.el8_3.i86"
+    parse_pkg_with_yum_mock = mock.Mock(return_value=("kernel-core", "0", "4.18.0", "240.10.1.el8_3", "i86"))
+    monkeypatch.setattr(pkghandler, "_parse_pkg_with_yum", value=parse_pkg_with_yum_mock)
+    pkghandler.parse_pkg_string(package)
+    parse_pkg_with_yum_mock.assert_called_once()
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "dnf", reason="cannot test yum backend if yum is not present")
+@pytest.mark.parametrize(
+    ("package", "expected"),
+    (PACKAGE_FORMATS),
+)
+def test_parse_pkg_with_yum(package, expected):
+    assert pkghandler._parse_pkg_with_yum(package) == expected
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "yum", reason="cannot test dnf backend if dnf is not present")
+@pytest.mark.parametrize(
+    ("package", "expected"),
+    (PACKAGE_FORMATS),
+)
+def test_parse_pkg_with_dnf(package, expected):
+    assert pkghandler._parse_pkg_with_dnf(package) == expected
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "yum", reason="cannot test dnf backend if dnf is not present")
+@pytest.mark.parametrize(
+    ("package"),
+    (
+        ("not a valid package"),
+        ("centos:0.1.0-34.aarch64"),
+        ("name:0-10._12.aarch64"),
+        ("kernel:0-10-1-2.aarch64"),
+        ("foo-15.x86_64"),
+    ),
+)
+def test_parse_pkg_with_dnf_value_error(package):
+    with pytest.raises(ValueError):
+        pkghandler._parse_pkg_with_dnf(package)
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "dnf", reason="dnf parsing function will raise a different valueError")
+@pytest.mark.parametrize(
+    ("package", "name", "epoch", "version", "release", "arch", "expected"),
+    (
+        (
+            "Network Manager:0-1.18.8-2.0.1.el7_9.aarch64",
+            "Network Manager",
+            "1",
+            "1.18.8",
+            "2.0.1.el7_9",
+            "aarch64",
+            re.escape("The following field(s) are invalid - name : Network Manager"),
+        ),
+        (
+            "NetworkManager:01-1.18.8-2.0.1.el7_9.aarch64",
+            "NetworkManager",
+            "O1",
+            "1.18.8",
+            "2.0.1.el7_9",
+            "aarch64",
+            re.escape("The following field(s) are invalid - epoch : O1"),
+        ),
+        (
+            "NetworkManager:1-1.1 8.8-2.0.1.el7_9.aarch64",
+            "NetworkManager",
+            "1",
+            "1.1 8.8",
+            "2.0.1.el7_9",
+            "aarch64",
+            re.escape("The following field(s) are invalid - version : 1.1 8.8"),
+        ),
+        (
+            "NetworkManager:1-1.18.8-2.0.1-el7_9.aarch64",
+            "NetworkManager",
+            "1",
+            "1.18.8",
+            "2.0.1-el7_9",
+            "aarch64",
+            re.escape("The following field(s) are invalid - release : 2.0.1-el7_9"),
+        ),
+        (
+            "NetworkManager:1-1.18.8-2.0.1.el7_9.aarch65",
+            "NetworkManager",
+            "1",
+            "1.18.8",
+            "2.0.1.el7_9",
+            "aarch65",
+            re.escape("The following field(s) are invalid - arch : aarch65"),
+        ),
+        (
+            "Network Manager:01-1.1 8.8-2.0.1-el7_9.aarch65",
+            "Network Manager",
+            "O1",
+            "1.1 8.8",
+            "2.0.1-el7_9",
+            "aarch65",
+            re.escape(
+                "The following field(s) are invalid - name : Network Manager, epoch : O1, version : 1.1 8.8, release : 2.0.1-el7_9, arch : aarch65"
+            ),
+        ),
+        (
+            "1-18.8-2.0.1.el7_9.aarch64",
+            None,
+            "1",
+            "1.18.8",
+            "2.0.1.el7_9",
+            "aarch64",
+            re.escape("The following field(s) are invalid - name : [None]"),
+        ),
+        (
+            "NetworkManager:1-2.0.1.el7_9.aarch64",
+            "NetworkManager",
+            "1",
+            None,
+            "2.0.1.el7_9",
+            "aarch64",
+            re.escape("The following field(s) are invalid - version : [None]"),
+        ),
+        (
+            "NetworkManager:1-1.18.8.el7_9.aarch64",
+            "NetworkManager",
+            "1",
+            "1.18.8",
+            None,
+            "aarch64",
+            re.escape("The following field(s) are invalid - release : [None]"),
+        ),
+    ),
+)
+def test_validate_parsed_fields_invalid(package, name, epoch, version, release, arch, expected):
+    with pytest.raises(ValueError, match=expected):
+        pkghandler._validate_parsed_fields(package, name, epoch, version, release, arch)
+
+
+@pytest.mark.skipif(pkgmanager.TYPE == "dnf", reason="dnf parsing function will raise a different valueError")
+@pytest.mark.parametrize(
+    ("package", "expected"),
+    (
+        (
+            "0:Network Manager-1.1.1-82.aarch64",
+            re.escape("The following field(s) are invalid - name : Network Manager"),
+        ),
+        (
+            "foo-15.x86_64",
+            re.escape(
+                "Invalid package - foo-15.x86_64, enter a package in one of the following formats: NEVRA, NEVR, NVRA, NVR, ENVRA, ENVR. Reason: The total length of the parsed package fields does not equal the package length,"
+            ),
+        ),
+        (
+            "notavalidpackage",
+            re.escape(
+                "Invalid package - notavalidpackage, enter a package in one of the following formats: NEVRA, NEVR, NVRA, NVR, ENVRA, ENVR. Reason: The total length of the parsed package fields does not equal the package length,"
+            ),
+        ),
+    ),
+)
+def test_validate_parsed_fields_invalid_package(package, expected):
+    with pytest.raises(ValueError, match=expected):
+        pkghandler.parse_pkg_string(package)
+
+
+@pytest.mark.parametrize(
+    ("package"),
+    (
+        pytest.param("kernel-core-0:4.18.0-240.10.1.el8_3.i86", id="NEVRA"),
+        pytest.param("kernel-core-0:4.18.0-240.10.1.el8_3", id="NEVR"),
+        pytest.param(
+            "1:NetworkManager-1.18.8-2.0.1.el7_9.aarch64",
+            id="ENVRA",
+        ),
+        pytest.param("1:NetworkManager-1.18.8-2.0.1.el7_9", id="ENVR"),
+        pytest.param(
+            "NetworkManager-1.18.8-2.0.1.el7_9.aarch64",
+            id="NVRA",
+        ),
+        pytest.param("NetworkManager-1.18.8-2.0.1.el7_9", id="NVR"),
+    ),
+)
+def test_validate_parsed_fields_valid(package):
+    pkghandler.parse_pkg_string(package)
 
 
 @pytest.mark.parametrize(
@@ -1958,28 +2119,6 @@ def test_get_pkg_names_from_rpm_paths(rpm_paths, expected, monkeypatch):
     assert pkghandler.get_pkg_names_from_rpm_paths(rpm_paths) == expected
 
 
-@pytest.mark.parametrize(
-    ("ret_code", "expected"), ((0, "Cached yum metadata cleaned successfully."), (1, "Failed to clean yum metadata"))
-)
-def test_clean_yum_metadata(ret_code, expected, monkeypatch, caplog):
-    run_subprocess_mock = mock.Mock(
-        side_effect=run_subprocess_side_effect(
-            (
-                ("yum", "clean", "metadata", "--quiet"),
-                (expected, ret_code),
-            ),
-        ),
-    )
-    monkeypatch.setattr(
-        pkghandler.utils,
-        "run_subprocess",
-        value=run_subprocess_mock,
-    )
-
-    pkghandler.clean_yum_metadata()
-    assert expected in caplog.records[-1].message
-
-
 @all_systems
 def test_get_system_packages_for_replacement(pretend_os, monkeypatch):
     pkgs = ["pkg-1", "pkg-2"]
@@ -1988,40 +2127,6 @@ def test_get_system_packages_for_replacement(pretend_os, monkeypatch):
     result = pkghandler.get_system_packages_for_replacement()
     for pkg in pkgs:
         assert pkg in result
-
-
-@pytest.mark.parametrize(
-    ("pkg_1", "pkg_2", "expected"),
-    (
-        (
-            "kernel-core-0:4.18.0-240.10.1.el8_3.x86_64",
-            "kernel-core-0:4.18.0-240.15.1.el8_3.x86_64",
-            -1,
-        ),
-        (
-            "kmod-core-0:4.18.0-240.15.1.el8_3.x86_64",
-            "kmod-core-0:4.18.0-240.10.1.el8_3.x86_64",
-            1,
-        ),
-        (
-            "kmod-core-0:4.18.0-240.15.1.el8_3.x86_64",
-            "kmod-core-0:4.18.0-240.15.1.el8_3.x86_64",
-            0,
-        ),
-        (
-            "no-arch-0:4.18.0-240.15.1.el8_3",
-            "no-arch-0:4.18.0-240.15.1.el8_3",
-            0,
-        ),
-        (
-            "kmod-core-0.4.18.0-240.15.1.el8_3.x86_64",
-            "kmod-core-0.4.18.0-240.15.1.el8_3.x86_64",
-            0,
-        ),
-    ),
-)
-def test__package_version_cmp(pkg_1, pkg_2, expected):
-    assert pkghandler._package_version_cmp(pkg_1, pkg_2) == expected
 
 
 @pytest.mark.skipif(

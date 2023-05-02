@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-#
 # Copyright(C) 2016 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,12 +26,12 @@ import rpm
 from convert2rhel import __version__ as installed_convert2rhel_version
 from convert2rhel import grub, pkgmanager, utils
 from convert2rhel.pkghandler import (
-    _package_version_cmp,
     call_yum_cmd,
     compare_package_versions,
     get_installed_pkg_objects,
     get_pkg_fingerprint,
     get_total_packages_to_update,
+    parse_pkg_string,
 )
 from convert2rhel.repo import get_hardcoded_repofiles_dir
 from convert2rhel.systeminfo import system_info
@@ -64,59 +62,25 @@ gpgkey=file://%s""" % (
     RPM_GPG_KEY_PATH,
 )
 
-PKG_NEVR = r"\b(\S+)-(?:([0-9]+):)?(\S+)-(\S+)\b"
-
 LINK_KMODS_RH_POLICY = "https://access.redhat.com/third-party-software-support"
 LINK_PREVENT_KMODS_FROM_LOADING = "https://access.redhat.com/solutions/41278"
 # The kernel version stays the same throughout a RHEL major version
 COMPATIBLE_KERNELS_VERS = {
-    6: "2.6.32",
     7: "3.10.0",
     8: "4.18.0",
 }
 
-# Python 2.6 compatibility.
-# This code is copied from Pthon-3.10's functools module,
-# licensed under the Python Software Foundation License, version 2
-try:
-    from functools import cmp_to_key
-except ImportError:
+VMLINUZ_FILEPATH = "/boot/vmlinuz-%s"
+"""The path to the vmlinuz file in a system."""
 
-    def cmp_to_key(mycmp):
-        """Convert a cmp= function into a key= function"""
+INITRAMFS_FILEPATH = "/boot/initramfs-%s.img"
+"""The path to the initramfs image in a system."""
 
-        class K(object):
-            __slots__ = ["obj"]
-
-            def __init__(self, obj):
-                self.obj = obj
-
-            def __lt__(self, other):
-                return mycmp(self.obj, other.obj) < 0
-
-            def __gt__(self, other):
-                return mycmp(self.obj, other.obj) > 0
-
-            def __eq__(self, other):
-                return mycmp(self.obj, other.obj) == 0
-
-            def __le__(self, other):
-                return mycmp(self.obj, other.obj) <= 0
-
-            def __ge__(self, other):
-                return mycmp(self.obj, other.obj) >= 0
-
-            __hash__ = None
-
-        return K
-
-
-# End of PSF Licensed code
+from functools import cmp_to_key
 
 
 def perform_system_checks():
     """Early checks after system facts should be added here."""
-
     check_custom_repos_are_valid()
     check_convert2rhel_latest()
     check_efi()
@@ -136,7 +100,7 @@ def perform_pre_ponr_checks():
 
 def check_convert2rhel_latest():
     """Make sure that we are running the latest downstream version of convert2rhel"""
-    logger.task("Prepare: Checking if this is the latest version of Convert2RHEL")
+    logger.task("Prepare: Check if this is the latest version of Convert2RHEL")
 
     if not system_info.has_internet_access:
         logger.warning("Skipping the check because no internet connection has been detected.")
@@ -152,6 +116,8 @@ def check_convert2rhel_latest():
         "--enablerepo=convert2rhel",
         "--releasever=%s" % system_info.version.major,
         "--setopt=reposdir=%s" % repo_dir,
+        "--qf",
+        "C2R %{NAME}-%{EPOCH}:%{VERSION}-%{RELEASE}.%{ARCH}",
         "convert2rhel",
     ]
 
@@ -171,9 +137,42 @@ def check_convert2rhel_latest():
         )
         return
 
-    convert2rhel_versions = re.findall(PKG_NEVR, raw_output_convert2rhel_versions, re.MULTILINE)
-    logger.debug("Found %s convert2rhel package(s)" % len(convert2rhel_versions))
+    # convert the raw output of convert2rhel version strings into a list
+    raw_output_convert2rhel_versions = raw_output_convert2rhel_versions.splitlines()
+
+    temp_raw_output = []
+
+    # We are expecting an repoquery output to be similar to this:
+    # C2R convert2rhel-0:0.17-1.el7.noarch
+    # We need the `C2R` identifier to be present on the line so we can know for
+    # sure that the line we are working with is the a line that contains
+    # relevant repoquery information to our check, otherwise, we just log the
+    # information as debug and do nothing with it.
+    for raw_version in raw_output_convert2rhel_versions:
+        if "C2R" in raw_version:
+            temp_raw_output.append(raw_version.lstrip("C2R "))
+        else:
+            # Mainly for debugging purposes to see what is happening if we got
+            # anything else that does not have the C2R identifier at the start
+            # of the line.
+            logger.debug("Got a line without the C2R identifier: %s" % raw_version)
+    raw_output_convert2rhel_versions = temp_raw_output
+
     latest_available_version = ("0", "0.00", "0")
+    convert2rhel_versions = []
+
+    # add each tuple of fields obtained from parse_pkg_string() to convert2rhel_versions
+    for raw_pkg in raw_output_convert2rhel_versions:
+        try:
+            parsed_pkg = parse_pkg_string(raw_pkg)
+
+        except ValueError as exc:
+            # Not a valid package string input
+            logger.debug(exc)
+            continue
+        convert2rhel_versions.append(parsed_pkg)
+
+    logger.debug("Found %s convert2rhel package(s)" % len(convert2rhel_versions))
 
     # This loop will determine the latest available convert2rhel version in the yum repo.
     # It assigns the epoch, version, and release ex: ("0", "0.26", "1.el7") to the latest_available_version variable.
@@ -181,12 +180,15 @@ def check_convert2rhel_latest():
         logger.debug("...comparing version %s" % latest_available_version[1])
         # rpm.labelCompare(pkg1, pkg2) compare two package version strings and return
         # -1 if latest_version is greater than package_version, 0 if they are equal, 1 if package_version is greater than latest_version
-        ver_compare = rpm.labelCompare(package_version[1:], latest_available_version)
+        ver_compare = rpm.labelCompare(
+            (package_version[1], package_version[2], package_version[3]), latest_available_version
+        )
+
         if ver_compare > 0:
             logger.debug(
-                "...found %s to be newer than %s, updating" % (package_version[1:][1], latest_available_version[1])
+                "...found %s to be newer than %s, updating" % (package_version[2], latest_available_version[1])
             )
-            latest_available_version = package_version[1:]
+            latest_available_version = (package_version[1], package_version[2], package_version[3])
 
     logger.debug("Found %s to be latest available version" % (latest_available_version[1]))
     # After the for loop, the latest_available_version variable will gain the epoch, version, and release
@@ -213,34 +215,24 @@ def check_convert2rhel_latest():
             )
 
         else:
-            if int(system_info.version.major) <= 6:
-                logger.warning(
-                    "You are currently running %s and the latest version of Convert2RHEL is %s.\n"
-                    "We encourage you to update to the latest version."
-                    % (installed_convert2rhel_version, latest_available_version[1])
-                )
-
-            else:
-                logger.critical(
-                    "You are currently running %s and the latest version of Convert2RHEL is %s.\n"
-                    "Only the latest version is supported for conversion. If you want to ignore"
-                    " this check, then set the environment variable 'CONVERT2RHEL_ALLOW_OLDER_VERSION=1' to continue."
-                    % (installed_convert2rhel_version, latest_available_version[1])
-                )
+            logger.critical(
+                "You are currently running %s and the latest version of Convert2RHEL is %s.\n"
+                "Only the latest version is supported for conversion. If you want to ignore"
+                " this check, then set the environment variable 'CONVERT2RHEL_ALLOW_OLDER_VERSION=1' to continue."
+                % (installed_convert2rhel_version, latest_available_version[1])
+            )
 
     else:
-        logger.info("Latest available Convert2RHEL version is installed.\n" "Continuing conversion.")
+        logger.info("Latest available Convert2RHEL version is installed.")
 
 
 def check_efi():
     """Inhibit the conversion when we are not able to handle UEFI."""
-    logger.task("Prepare: Checking the firmware interface type (BIOS/UEFI)")
+    logger.task("Prepare: Check the firmware interface type (BIOS/UEFI)")
     if not grub.is_efi():
         logger.info("BIOS detected.")
         return
     logger.info("UEFI detected.")
-    if system_info.version.major == 6:
-        logger.critical("The conversion with UEFI is possible only for systems of major version 7 and newer.")
     if not os.path.exists("/usr/sbin/efibootmgr"):
         logger.critical("Install efibootmgr to continue converting the UEFI-based system.")
     if system_info.arch != "x86_64":
@@ -283,7 +275,7 @@ def check_tainted_kmods():
         system76_io 16384 0 - Live 0x0000000000000000 (OE)  <<<<<< Tainted
         system76_acpi 16384 0 - Live 0x0000000000000000 (OE) <<<<<< Tainted
     """
-    logger.task("Prepare: Checking if loaded kernel modules are not tainted")
+    logger.task("Prepare: Check if loaded kernel modules are not tainted")
     unsigned_modules, _ = run_subprocess(["grep", "(", "/proc/modules"])
     module_names = "\n  ".join([mod.split(" ")[0] for mod in unsigned_modules.splitlines()])
     if unsigned_modules:
@@ -305,7 +297,7 @@ def check_readonly_mounts():
     Having /mnt/ and /sys/ read-only causes the installation of the filesystem package to
     fail (https://bugzilla.redhat.com/show_bug.cgi?id=1887513, https://github.com/oamg/convert2rhel/issues/123).
     """
-    logger.task("Prepare: Checking /mnt and /sys are read-write")
+    logger.task("Prepare: Check /mnt and /sys are read-write")
 
     mounts = get_file_content("/proc/mounts", as_list=True)
     for line in mounts:
@@ -335,7 +327,7 @@ def check_custom_repos_are_valid():
     - YUM/DNF is able to find the repoids (to rule out a typo)
     - the repository "baseurl" is accessible and contains repository metadata
     """
-    logger.task("Prepare: Checking if --enablerepo repositories are accessible")
+    logger.task("Prepare: Check if --enablerepo repositories are accessible")
 
     if not tool_opts.no_rhsm:
         logger.info("Skipping the check of repositories due to the use of RHSM for the conversion.")
@@ -370,20 +362,21 @@ def ensure_compatibility_of_kmods():
     if not unsupported_kmods:
         logger.debug("All loaded kernel modules are available in RHEL.")
     else:
-        if "CONVERT2RHEL_ALLOW_UNCHECKED_KMODS" in os.environ:
+        if "CONVERT2RHEL_ALLOW_UNAVAILABLE_KMODS" in os.environ:
             logger.warning(
-                "Detected 'CONVERT2RHEL_ALLOW_UNCHECKED_KMODS' environment variable."
-                " We will continue the conversion, with the following kernel modules:\n{kmods}\n".format(
-                    kmods="\n".join(unsupported_kmods)
-                )
+                "Detected 'CONVERT2RHEL_ALLOW_UNAVAILABLE_KMODS' environment variable."
+                " We will continue the conversion with the following kernel modules unavailable in RHEL:\n"
+                "{kmods}\n".format(kmods="\n".join(unsupported_kmods))
             )
         else:
             logger.critical(
                 "The following loaded kernel modules are not available in RHEL:\n{0}\n"
-                "Kernel modules need to be up-to-date to minimize the risk for issues occurring related to first-party kernel modules.\n"
-                "Ensure you have updated the kernel to the latest available version and rebooted the system.\n"
-                "If this message persists, you can prevent the modules from loading by following {1} and rerun convert2rhel.\n"
-                "To circumvent this check and allow the risk you can set environment variable 'CONVERT2RHEL_ALLOW_UNCHECKED_KMODS=1'.".format(
+                "Ensure you have updated the kernel to the latest available version and rebooted the system.\nIf this "
+                "message persists, you can prevent the modules from loading by following {1} and rerun convert2rhel.\n"
+                "Keeping them loaded could cause the system to malfunction after the conversion as they might not work "
+                "properly with the RHEL kernel.\n"
+                "To circumvent this check and accept the risk you can set environment variable "
+                "'CONVERT2RHEL_ALLOW_UNAVAILABLE_KMODS=1'.".format(
                     "\n".join(unsupported_kmods), LINK_PREVENT_KMODS_FROM_LOADING
                 )
             )
@@ -391,7 +384,7 @@ def ensure_compatibility_of_kmods():
 
 def validate_package_manager_transaction():
     """Validate the package manager transaction is passing the tests."""
-    logger.task("Validate the %s transaction", pkgmanager.TYPE)
+    logger.task("Prepare: Validate the %s transaction", pkgmanager.TYPE)
     transaction_handler = pkgmanager.create_transaction_handler()
     transaction_handler.run_transaction(
         validate_transaction=True,
@@ -519,7 +512,7 @@ def get_most_recent_unique_kernel_pkgs(pkgs):
             list_of_sorted_pkgs.append(
                 max(
                     distinct_kernel_pkgs[1],
-                    key=cmp_to_key(_package_version_cmp),
+                    key=cmp_to_key(compare_package_versions),
                 )
             )
 
@@ -655,7 +648,7 @@ def _bad_kernel_substring(kernel_release):
 
 def check_package_updates():
     """Ensure that the system packages installed are up-to-date."""
-    logger.task("Prepare: Checking if the installed packages are up-to-date")
+    logger.task("Prepare: Check if the installed packages are up-to-date")
 
     if system_info.id == "oracle" and system_info.corresponds_to_rhel_eus_release():
         logger.info(
@@ -706,7 +699,7 @@ def check_package_updates():
 
 def is_loaded_kernel_latest():
     """Check if the loaded kernel is behind or of the same version as in yum repos."""
-    logger.task("Prepare: Checking if the loaded kernel version is the most recent")
+    logger.task("Prepare: Check if the loaded kernel version is the most recent")
 
     if system_info.id == "oracle" and system_info.corresponds_to_rhel_eus_release():
         logger.info(
@@ -715,105 +708,113 @@ def is_loaded_kernel_latest():
         )
         return
 
-    reposdir = get_hardcoded_repofiles_dir()
+    cmd = [
+        "repoquery",
+        "--setopt=exclude=",
+        "--quiet",
+        "--qf",
+        "C2R\\t%{BUILDTIME}\\t%{VERSION}-%{RELEASE}\\t%{REPOID}",
+    ]
 
+    reposdir = get_hardcoded_repofiles_dir()
     if reposdir and not system_info.has_internet_access:
         logger.warning("Skipping the check as no internet connection has been detected.")
         return
 
-    cmd = ["repoquery", "--setopt=exclude=", "--quiet", "--qf", "%{BUILDTIME}\\t%{VERSION}-%{RELEASE}\\t%{REPOID}"]
-
-    # If the reposdir variable is not empty, meaning that it detected the hardcoded repofiles, we should use that
+    # If the reposdir variable is not empty, meaning that it detected the
+    # hardcoded repofiles, we should use that
     # instead of the system repositories located under /etc/yum.repos.d
     if reposdir:
         cmd.append("--setopt=reposdir=%s" % reposdir)
 
-    # For Oracle/CentOS Linux 8 the `kernel` is just a meta package, instead, we check for `kernel-core`.
-    # But for 6 and 7 releases, the correct way to check is using `kernel`.
+    # For Oracle/CentOS Linux 8 the `kernel` is just a meta package, instead,
+    # we check for `kernel-core`. But 7 releases, the correct way to check is
+    # using `kernel`.
     package_to_check = "kernel-core" if system_info.version.major >= 8 else "kernel"
 
     # Append the package name as the last item on the list
     cmd.append(package_to_check)
 
-    # Search for available kernel package versions available in different
-    # repositories using the `repoquery` command.  If convert2rhel is running
-    # on a EUS system, then repoquery will use the hardcoded repofiles
-    # available under /usr/share/convert2rhel/repos, meaning that the tool will
-    # fetch only the latest kernels available for that EUS version, and not the
-    # most updated version from other newer versions.  If the case is that
-    # convert2rhel is not running on a EUS system, for example, Oracle Linux
-    # 8.5, then it will use the system repofiles.
+    # Look up for available kernel (or kernel-core) packages versions available
+    # in different repositories using the `repoquery` command.  If convert2rhel
+    # detects that it is running on a EUS system, then repoquery will use the
+    # hardcoded repofiles available under `/usr/share/convert2rhel/repos`,
+    # meaning that the tool will fetch only the latest kernels available for
+    # that EUS version, and not the most updated version from other newer
+    # versions.
     repoquery_output, return_code = run_subprocess(cmd, print_output=False)
-
     if return_code != 0:
         logger.debug("Got the following output: %s", repoquery_output)
         logger.warning(
-            "Couldn't fetch the list of the most recent kernels available in the repositories. Skipping the loaded kernel check."
+            "Couldn't fetch the list of the most recent kernels available in "
+            "the repositories. Skipping the loaded kernel check."
         )
         return
 
-    # Repoquery doesn't return any text at all when it can't find any matches for the query (when used with --quiet)
-    if len(repoquery_output) > 0:
-        # Convert to an tuple split with `buildtime` and `kernel` version.
-        # We are also detecting if the sentence "listed more than once in the configuration"
-        # appears in the repoquery output. If it does, we ignore it.
-        # This later check is supposed to avoid duplicate repofiles being defined in the system,
-        # this is a super corner case and should not happen everytime, but if it does, we are aware now.
-        packages = [
-            tuple(str(line).split("\t"))
-            for line in repoquery_output.split("\n")
-            if (line.strip() and "listed more than once in the configuration" not in line.lower())
-        ]
-        # Filter out any error messages (things that do not have the three
-        # fields which we expect)
-        packages = [pkg for pkg in packages if len(pkg) == 3]
-
-        # Sort out for the most recent kernel with reverse order
-        # In case `repoquery` returns more than one kernel in the output
-        # We display the latest one to the user.
-        packages.sort(key=lambda x: x[0], reverse=True)
-
-        _, latest_kernel, repoid = packages[0]
-
-        # The loaded kernel version
-        uname_output, _ = run_subprocess(["uname", "-r"], print_output=False)
-        loaded_kernel = uname_output.rsplit(".", 1)[0]
-        match = compare_package_versions(latest_kernel, str(loaded_kernel))
-
-        if match == 0:
-            logger.info("The currently loaded kernel is at the latest version.")
+    packages = []
+    # We are expecting a repoquery output to be similar to this:
+    #   C2R     1671212820      3.10.0-1160.81.1.el7    updates
+    # We need the `C2R` identifier to be present on the line so we can know for
+    # sure that the line we are working with is a line that contains
+    # relevant repoquery information to our check, otherwise, we just log the
+    # information as debug and do nothing with it.
+    for line in repoquery_output.split("\n"):
+        if line.strip() and "C2R" in line:
+            _, build_time, latest_kernel, repoid = tuple(str(line).split("\t"))
+            packages.append((build_time, latest_kernel, repoid))
         else:
-            repos_message = (
-                "in the enabled system repositories"
-                if not reposdir
-                else "in repositories defined in the %s folder" % reposdir
-            )
-            logger.critical(
-                "The version of the loaded kernel is different from the latest version %s.\n"
-                " Latest kernel version available in %s: %s\n"
-                " Loaded kernel version: %s\n\n"
-                "To proceed with the conversion, update the kernel version by executing the following step:\n\n"
-                "1. yum install %s-%s -y\n"
-                "2. reboot" % (repos_message, repoid, latest_kernel, loaded_kernel, package_to_check, latest_kernel)
-            )
-    else:
-        # Repoquery failed to detected any kernel or kernel-core packages in it's repositories
-        # we allow the user to provide a environment variable to override the functionality and proceed
-        # with the conversion, otherwise, we just throw an critical logging to them.
-        unsupported_skip = os.environ.get("CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK", "0")
-        if unsupported_skip == "1":
-            logger.warning(
-                "Detected 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK' environment variable, we will skip "
-                "the %s comparison.\n"
-                "Beware, this could leave your system in a broken state. " % package_to_check
-            )
-        else:
+            # Mainly for debugging purposes to see what is happening if we got
+            # anything else that does not have the C2R identifier at the start
+            # of the line.
+            logger.debug("Got a line without the C2R identifier: %s" % line)
+
+    # If we don't have any packages, then something went wrong, we need to
+    # decide wether to bail out or output a warning (only if the user used the
+    # special environment variable for it.
+    if not packages:
+        unsupported_skip = os.environ.get("CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK", None)
+        if not unsupported_skip:
             logger.critical(
                 "Could not find any %s from repositories to compare against the loaded kernel.\n"
                 "Please, check if you have any vendor repositories enabled to proceed with the conversion.\n"
                 "If you wish to ignore this message, set the environment variable "
                 "'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK' to 1." % package_to_check
             )
+
+        logger.warning(
+            "Detected 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK' environment variable, we will skip "
+            "the %s comparison.\n"
+            "Beware, this could leave your system in a broken state. " % package_to_check
+        )
+        return
+
+    packages.sort(key=lambda x: x[0], reverse=True)
+    _, latest_kernel, repoid = packages[0]
+
+    uname_output, _ = run_subprocess(["uname", "-r"], print_output=False)
+    loaded_kernel = uname_output.rsplit(".", 1)[0]
+    # append the package name to loaded_kernel and latest_kernel so they can be properly processed by
+    # compare_package_versions()
+    latest_kernel_pkg = "%s-%s" % (package_to_check, latest_kernel)
+    loaded_kernel_pkg = "%s-%s" % (package_to_check, loaded_kernel)
+    match = compare_package_versions(latest_kernel_pkg, loaded_kernel_pkg)
+
+    if match != 0:
+        repos_message = (
+            "in the enabled system repositories"
+            if not reposdir
+            else "in repositories defined in the %s folder" % reposdir
+        )
+        logger.critical(
+            "The version of the loaded kernel is different from the latest version %s.\n"
+            " Latest kernel version available in %s: %s\n"
+            " Loaded kernel version: %s\n\n"
+            "To proceed with the conversion, update the kernel version by executing the following step:\n\n"
+            "1. yum install %s-%s -y\n"
+            "2. reboot" % (repos_message, repoid, latest_kernel, loaded_kernel, package_to_check, latest_kernel)
+        )
+
+    logger.info("The currently loaded kernel is at the latest version.")
 
 
 def check_dbus_is_running():
@@ -830,5 +831,81 @@ def check_dbus_is_running():
 
     logger.critical(
         "Could not find a running DBus Daemon which is needed to register with subscription manager.\n"
-        "Please start dbus using `systemctl start dbus` or (on CentOS Linux 6), `service messagebus start`"
+        "Please start dbus using `systemctl start dbus`"
     )
+
+
+def _is_initramfs_file_valid(filepath):
+    """Internal function to verify if an initramfs file is corrupted.
+
+    This method will rely on using lsinitrd to do the validation. If the
+    lsinitrd returns other value that is not 0, then it means that the file is
+    probably corrupted or may cause problems during the next reboot.
+
+    :param filepath: The path to the initramfs file.
+    :type filepath: str
+    :return: A boolean to determine if the file is corrupted.
+    :rtype: bool
+    """
+    logger.info("Checking if the '%s' file is valid.", filepath)
+
+    if not os.path.exists(filepath):
+        logger.info("The initramfs file is not present.")
+        return False
+
+    logger.debug("Checking if the '%s' file is not corrupted.", filepath)
+    out, return_code = run_subprocess(
+        cmd=["/usr/bin/lsinitrd", filepath],
+        print_output=False,
+    )
+
+    if return_code != 0:
+        logger.info("Couldn't verify initramfs file. It may be corrupted.")
+        logger.debug("Output of lsinitrd: %s", out)
+        return False
+
+    return True
+
+
+def check_kernel_boot_files():
+    """Check if the required kernel files exist and are valid under the boot partition."""
+    # For Oracle/CentOS Linux 8 the `kernel` is just a meta package, instead,
+    # we check for `kernel-core`. This is not true regarding the 7.* releases.
+    kernel_name = "kernel-core" if system_info.version.major >= 8 else "kernel"
+
+    # Either the package is returned or not. The return_code will be 0 in
+    # either case, so we don't care about checking for that here.
+    output, _ = run_subprocess(["rpm", "-q", "--last", kernel_name], print_output=False)
+
+    # We are parsing the latest kernel installed on the system, which at this
+    # point, should be a RHEL kernel. Since we can't get the kernel version
+    # from `uname -r`, as it requires a reboot in order to take place, we are
+    # detecting the latest kernel by using `rpm` and figuring out which was the
+    # latest kernel installed.
+    latest_installed_kernel = output.split("\n")[0].split(" ")[0]
+    latest_installed_kernel = latest_installed_kernel[len(kernel_name + "-") :]
+    grub2_config_file = grub.get_grub_config_file()
+    initramfs_file = INITRAMFS_FILEPATH % latest_installed_kernel
+    vmlinuz_file = VMLINUZ_FILEPATH % latest_installed_kernel
+
+    logger.info("Checking if the '%s' file exists.", vmlinuz_file)
+    vmlinuz_exists = os.path.exists(vmlinuz_file)
+    if not vmlinuz_exists:
+        logger.info("The vmlinuz file is not present.")
+
+    is_initramfs_valid = _is_initramfs_file_valid(initramfs_file)
+
+    if not is_initramfs_valid or not vmlinuz_exists:
+        logger.warning(
+            "Couldn't verify the kernel boot files in the boot partition. This may cause problems during the next boot "
+            "of your system.\nIn order to fix this problem you may need to free/increase space in your boot partition"
+            " and then run the following commands in your terminal:\n"
+            "1. yum reinstall %s-%s -y\n"
+            "2. grub2-mkconfig -o %s\n"
+            "3. reboot",
+            kernel_name,
+            latest_installed_kernel,
+            grub2_config_file,
+        )
+    else:
+        logger.info("The initramfs and vmlinuz files are valid.")

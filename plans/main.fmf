@@ -2,30 +2,28 @@ execute:
     how: tmt
 discover:
     how: fmf
-environment:
+
+environment+:
     NO_COLOR: 1
 
 adjust+:
     - environment+:
-        SYSTEM_RELEASE: centos-7
+        SYSTEM_RELEASE_ENV: centos-7
       when: distro == centos-7
     - environment+:
-        SYSTEM_RELEASE: oracle-7
+        SYSTEM_RELEASE_ENV: oracle-7
       when: distro == oraclelinux-7
     - environment+:
-        SYSTEM_RELEASE: centos-8.4
+        SYSTEM_RELEASE_ENV: centos-8.4
       when: distro == centos-8.4
     - environment+:
-        SYSTEM_RELEASE: centos-8.5
+        SYSTEM_RELEASE_ENV: centos-8.5
       when: distro == centos-8-latest
     - environment+:
-        SYSTEM_RELEASE: oracle-8.4
-      when: distro == oraclelinux-8.4
-    - environment+:
         #TODO bump distro context to 8.7 when the image is available on the testing farm
-        # Even though the distro context is 8.6 we are setting the SYSTEM_RELEASE to 8.7
+        # Even though the distro context is 8.6 we are setting the SYSTEM_RELEASE_ENV to 8.7
         # to tag the updated system correctly
-        SYSTEM_RELEASE: oracle-8.7
+        SYSTEM_RELEASE_ENV: oracle-8.7
       when: distro == oraclelinux-8.6
 
 prepare:
@@ -36,7 +34,6 @@ prepare:
       how: ansible
       playbook: tests/ansible_collections/roles/reboot/main.yml
     - name: install latest copr build
-      when: type != redhat-brew-build
       how: install
       copr: '@oamg/convert2rhel'
       package: convert2rhel
@@ -52,4 +49,4 @@ prepare:
 
 # Commenting this out in favour of using a github actions with tft
 environment-file:
-  - https://gitlab.cee.redhat.com/oamg/convert2rhel/convert2rhel-secrets/-/raw/main/.env
+    - https://gitlab.cee.redhat.com/oamg/convert2rhel/convert2rhel-secrets/-/raw/main/.env

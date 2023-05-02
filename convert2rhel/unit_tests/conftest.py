@@ -4,7 +4,7 @@ import sys
 import pytest
 import six
 
-from convert2rhel import backup, cert, redhatrelease, systeminfo, toolopts, utils
+from convert2rhel import backup, cert, pkgmanager, redhatrelease, systeminfo, toolopts, utils
 from convert2rhel.logger import setup_logger_handler
 from convert2rhel.systeminfo import system_info
 from convert2rhel.toolopts import tool_opts
@@ -16,33 +16,17 @@ if sys.version_info[:2] <= (2, 7):
 else:
     from unittest import mock  # pylint: disable=no-name-in-module
 
-try:
-    from pytest_catchlog import CompatLogCaptureFixture
-
-    class SubCompatLogCaptureFixture(CompatLogCaptureFixture):
-        @property
-        def messages(self):
-            return [r.getMessage() for r in self.records]
-
-    @pytest.fixture
-    def caplog(request):
-        """Access and control log capturing.
-        Captured logs are available through the following properties/methods::
-        * caplog.messages        -> list of format-interpolated log messages
-        * caplog.text            -> string containing formatted log output
-        * caplog.records         -> list of logging.LogRecord instances
-        * caplog.record_tuples   -> list of (logger_name, level, message) tuples
-        * caplog.clear()         -> clear captured records and formatted log output string
-        """
-        return SubCompatLogCaptureFixture(request.node)
-
-except ImportError:
-    pass
-
-
-@pytest.fixture(scope="session")
-def is_py26():
-    return sys.version_info[:2] == (2, 6)
+# We are injecting a instance of `mock.Mock()` for `Depsolve` class and
+# `callback` module, as when we run the tests under CentOS 7, it fails by saying
+# that `pkgmanager.callback.Depsolve` can't be imported as it is an import from
+# DNF, not YUM.
+# This implies in us mocking those targets on Python 2.7, as DNF is only
+# available on Python 3+.
+# Not a perfect solution, but a needed one since we are inheriting this
+# class/module in the dnf handler module.
+if sys.version_info[:2] <= (2, 7):
+    pkgmanager.Depsolve = mock.Mock()
+    pkgmanager.callback = mock.Mock()
 
 
 @pytest.fixture(scope="session")
@@ -303,11 +287,6 @@ centos7 = pytest.mark.parametrize(
 centos8 = pytest.mark.parametrize(
     "pretend_os",
     (("8.4.1111", "CentOS Linux"),),
-    indirect=True,
-)
-oracle6 = pytest.mark.parametrize(
-    "pretend_os",
-    (("6.10.1111", "Oracle Linux Server"),),
     indirect=True,
 )
 oracle7 = pytest.mark.parametrize(

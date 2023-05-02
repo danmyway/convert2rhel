@@ -27,8 +27,6 @@ import dbus
 import dbus.connection
 import dbus.exceptions
 
-from six.moves import urllib
-
 from convert2rhel import backup, i18n, pkghandler, utils
 from convert2rhel.redhatrelease import os_release_file
 from convert2rhel.systeminfo import system_info
@@ -39,14 +37,6 @@ loggerinst = logging.getLogger(__name__)
 
 SUBMGR_RPMS_DIR = os.path.join(utils.DATA_DIR, "subscription-manager")
 _RHSM_TMP_DIR = os.path.join(utils.TMP_DIR, "rhsm")
-_CENTOS_6_REPO_CONTENT = (
-    "[centos-6-contrib-convert2rhel]\n"
-    "name=CentOS Linux 6 - Contrib added by Convert2RHEL\n"
-    "baseurl=https://vault.centos.org/centos/6/contrib/$basearch/\n"
-    "gpgcheck=1\n"
-    "enabled=1\n"
-)
-_CENTOS_6_REPO_PATH = os.path.join(_RHSM_TMP_DIR, "centos_6.repo")
 _UBI_7_REPO_CONTENT = (
     "[ubi-7-convert2rhel]\n"
     "name=Red Hat Universal Base Image 7 - added by Convert2RHEL\n"
@@ -220,16 +210,6 @@ def register_system():
 def _stop_rhsm():
     """Stop the rhsm service."""
     cmd = ["/bin/systemctl", "stop", "rhsm"]
-    if system_info.version.major <= 6:
-        # On RHEL6, there isn't a service-oriented way to stop rhsm.  It is started on demand so
-        # there isn't an init script to stop it.  If we find we need to stop it, because we're
-        # etting "machine is already registered" errors there, then we'll need to look for
-        # rhsm-service in the process list and send it the TERM signal.
-        loggerinst.info(
-            "Skipping RHSM service shutdown on {0} {1}.".format(system_info.name, system_info.version.major)
-        )
-        return
-
     output, ret_code = utils.run_subprocess(cmd, print_output=False)
     if ret_code != 0:
         raise StopRhsmError("Stopping RHSM failed with code: %s; output: %s" % (ret_code, output))
@@ -315,16 +295,6 @@ class RegistrationCommand(object):
             loggerinst.info("    ... activation key detected")
             registration_attributes["activation_key"] = tool_opts.activation_key
 
-            while "org" not in registration_attributes:
-                loggerinst.info("    ... activation key requires organization")
-                # Organization is required when activation key is used
-                # TODO: Parse the output of 'subscription-manager orgs' and let the
-                # user choose from the available organizations. If there's just one,
-                # pick it automatically.
-                org = utils.prompt_user("Organization: ").strip()
-                # In case the user entered the empty string
-                if org:
-                    registration_attributes["org"] = org
         else:
             # No activation key -> username/password required
             if tool_opts.username and tool_opts.password:
@@ -346,9 +316,6 @@ class RegistrationCommand(object):
                 loggerinst.info("    ... password detected")
                 password = tool_opts.password
             else:
-                if tool_opts.username:
-                    # Hint user for which username they need to enter pswd
-                    loggerinst.info("Username: %s", username)  # lgtm[py/clear-text-logging-sensitive-data]
                 password = ""
                 while not password:
                     password = utils.prompt_user("Password: ", password=True)
@@ -366,42 +333,6 @@ class RegistrationCommand(object):
             registration_attributes["rhsm_prefix"] = tool_opts.rhsm_prefix
 
         return cls(**registration_attributes)
-
-    @property
-    def args(self):
-        """
-        This property is a list of the command-line arguments that will be passed to
-        subscription-manager to register the system. Set the individual attributes for
-        :attr:`server_url`, :attr:`activation_key`, etc to affect the values here.
-
-        .. note:: :attr:`password` is not passed on the command line. Instead,
-            it is sent to the running subscription-manager process via pexpect.
-        """
-        args = ["register", "--force"]
-
-        if self.connection_opts:
-            if self.rhsm_port:
-                netloc = "%s:%s" % (self.rhsm_hostname, self.rhsm_port)
-            else:
-                netloc = self.rhsm_hostname
-
-            prefix = self.rhsm_prefix if self.rhsm_prefix else ""
-            if prefix.startswith("/"):
-                prefix = prefix[1:]
-
-            server_url = urllib.parse.urlunsplit(("https", netloc, prefix, "", ""))
-            args.append("--serverurl=%s" % server_url)
-
-        if self.activation_key:
-            args.append("--activationkey=%s" % self.activation_key)
-
-        if self.org:
-            args.append("--org=%s" % self.org)
-
-        if self.username:
-            args.append("--username=%s" % self.username)
-
-        return args
 
     @property
     def connection_opts(self):
@@ -430,10 +361,6 @@ class RegistrationCommand(object):
         Use dbus to register the system with subscription-manager.
 
         Status of dbus on various platforms:
-            * RHEL6:
-                * DBUS-1.2.24 is present but may not be installed.
-                * Install the dbus package and run /etc/rc.d/init.d/messagebus start
-                * dbus-python-0.83.0 is available
             * RHEL7:
                 * dbus-1.10.24 is installed and run by default
                 * dbus-python-1.1.9 is available
@@ -469,7 +396,12 @@ class RegistrationCommand(object):
 
             try:
                 if self.password:
-                    loggerinst.info("Registering via username/password: %s" % " ".join(utils.hide_secrets(self.args)))
+                    if self.org:
+                        loggerinst.info("Organization: %s", utils.OBFUSCATION_STRING)
+                    loggerinst.info("Username: %s", utils.OBFUSCATION_STRING)
+                    loggerinst.info("Password: %s", utils.OBFUSCATION_STRING)
+                    loggerinst.info("Connection Options: %s", self.connection_opts)
+                    loggerinst.info("Locale settings: %s", i18n.SUBSCRIPTION_MANAGER_LOCALE)
                     args = (
                         self.org or "",
                         self.username,
@@ -489,7 +421,10 @@ class RegistrationCommand(object):
                     )
 
                 else:
-                    loggerinst.info("Registering via org/activation_key: %s" % " ".join(utils.hide_secrets(self.args)))
+                    loggerinst.info("Organization: %s", utils.OBFUSCATION_STRING)
+                    loggerinst.info("Activation Key: %s", utils.OBFUSCATION_STRING)
+                    loggerinst.info("Connection Options: %s", self.connection_opts)
+                    loggerinst.info("Locale settings: %s", i18n.SUBSCRIPTION_MANAGER_LOCALE)
                     args = (
                         self.org,
                         [self.activation_key],
@@ -1000,11 +935,7 @@ def download_rhsm_pkgs():
         "subscription-manager-rhsm-certificates",
     ]
 
-    if system_info.version.major == 6:
-        pkgs_to_download.append("subscription-manager-rhsm")
-        _download_rhsm_pkgs(pkgs_to_download, _CENTOS_6_REPO_PATH, _CENTOS_6_REPO_CONTENT)
-
-    elif system_info.version.major == 7:
+    if system_info.version.major == 7:
         pkgs_to_download += ["subscription-manager-rhsm", "python-syspurpose"]
         _download_rhsm_pkgs(pkgs_to_download, _UBI_7_REPO_PATH, _UBI_7_REPO_CONTENT)
 
@@ -1099,6 +1030,10 @@ def update_rhsm_custom_facts():
     the conversion with the candlepin server, thus, propagating the
     "breadcrumbs" from convert2rhel as RHSM facts.
     """
+    if "CONVERT2RHEL_DISABLE_TELEMETRY" in os.environ:
+        loggerinst.info("Telemetry disabled, skipping RHSM facts upload.")
+        return
+
     if not tool_opts.no_rhsm:
         loggerinst.info("Updating RHSM custom facts collected during the conversion.")
         cmd = ["subscription-manager", "facts", "--update"]

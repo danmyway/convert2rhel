@@ -1,7 +1,10 @@
+import pytest
+
 from conftest import SATELLITE_PKG_DST, SATELLITE_PKG_URL
 from envparse import env
 
 
+@pytest.mark.satellite_conversion
 def test_satellite_conversion(shell, convert2rhel):
     # Remove subscription manager if installed
     assert shell("yum remove subscription-manager -y").returncode == 0
@@ -16,7 +19,7 @@ def test_satellite_conversion(shell, convert2rhel):
     )
 
     with convert2rhel(
-        ("-y --no-rpm-va -k {} -o {} --debug").format(
+        "-y --no-rpm-va -k {} -o {} --debug".format(
             env.str("SATELLITE_KEY"),
             env.str("SATELLITE_ORG"),
         )

@@ -26,7 +26,6 @@ from collections import namedtuple
 import pytest
 import six
 
-import convert2rhel.toolopts
 import convert2rhel.utils
 
 from convert2rhel.toolopts import tool_opts
@@ -92,9 +91,9 @@ class TestTooloptsParseFromCLI(object):
     def test_no_serverurl(self, monkeypatch, global_tool_opts):
         monkeypatch.setattr(sys, "argv", mock_cli_arguments([]))
         convert2rhel.toolopts.CLI()
-        assert global_tool_opts.rhsm_hostname == None
-        assert global_tool_opts.rhsm_port == None
-        assert global_tool_opts.rhsm_prefix == None
+        assert global_tool_opts.rhsm_hostname is None
+        assert global_tool_opts.rhsm_port is None
+        assert global_tool_opts.rhsm_prefix is None
 
     @pytest.mark.parametrize(
         "serverurl",
@@ -200,7 +199,7 @@ def test_both_disable_submgr_and_no_rhsm_options_work(argv, raise_exception, no_
     ("argv", "content", "output", "message"),
     (
         (
-            mock_cli_arguments([""]),
+            mock_cli_arguments([]),
             "[subscription_manager]\npassword=conf_pass",
             {"password": "conf_pass", "activation_key": None},
             None,
@@ -213,28 +212,28 @@ def test_both_disable_submgr_and_no_rhsm_options_work(argv, raise_exception, no_
             " the configuration file. We're going to use the command line values.",
         ),
         (
-            mock_cli_arguments(["-k", "activation_key"]),
+            mock_cli_arguments(["-k", "activation_key", "-o", "org"]),
             "[subscription_manager]\nactivation_key=conf_key",
             {"password": None, "activation_key": "activation_key"},
             "You have passed either the RHSM password or activation key through both the command line and"
             " the configuration file. We're going to use the command line values.",
         ),
         (
-            mock_cli_arguments(["-k", "activation_key"]),
+            mock_cli_arguments(["-k", "activation_key", "-o", "org"]),
             "[subscription_manager]\npassword=conf_pass",
             {"password": "conf_pass", "activation_key": "activation_key"},
             "You have passed either the RHSM password or activation key through both the command line and"
             " the configuration file. We're going to use the command line values.",
         ),
         (
-            mock_cli_arguments(["-k", "activation_key", "-p", "password"]),
+            mock_cli_arguments(["-k", "activation_key", "-p", "password", "-o", "org"]),
             "[subscription_manager]\npassword=conf_pass\nactivation_key=conf_key",
             {"password": "password", "activation_key": "activation_key"},
             "You have passed either the RHSM password or activation key through both the command line and"
             " the configuration file. We're going to use the command line values.",
         ),
         (
-            mock_cli_arguments([""]),
+            mock_cli_arguments(["-o", "org"]),
             "[subscription_manager]\npassword=conf_pass\nactivation_key=conf_key",
             {"password": "conf_pass", "activation_key": "conf_key"},
             "Either a password or an activation key can be used for system registration. We're going to use the"
@@ -337,7 +336,7 @@ def test_multiple_auth_src_files(argv, content, message, output, caplog, monkeyp
     ("argv", "message", "output"),
     (
         (
-            mock_cli_arguments(["--password", "pass", "--activationkey", "key"]),
+            mock_cli_arguments(["--password", "pass", "--activationkey", "key", "-o", "org"]),
             "Either a password or an activation key can be used for system registration."
             " We're going to use the activation key.",
             {"password": "pass", "activation_key": "key"},
@@ -479,17 +478,17 @@ def test_validate_serverurl_parsing(url_parts, message):
 def test__log_command_used(caplog, monkeypatch):
     obfuscation_string = "*" * 5
     input_command = mock_cli_arguments(
-        ["--username", "uname", "--password", "123", "--activationkey", "456", "--token", "789"]
+        ["--username", "uname", "--password", "123", "--activationkey", "456", "--org", "789"]
     )
     expected_command = mock_cli_arguments(
         [
             "--username",
-            "uname",
+            obfuscation_string,
             "--password",
             obfuscation_string,
             "--activationkey",
             obfuscation_string,
-            "--token",
+            "--org",
             obfuscation_string,
         ]
     )
@@ -497,3 +496,30 @@ def test__log_command_used(caplog, monkeypatch):
     convert2rhel.toolopts._log_command_used()
 
     assert " ".join(expected_command) in caplog.records[-1].message
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    (
+        # The message is a log of used command
+        (mock_cli_arguments(["-o", "org", "-k", "key"]), "-o ***** -k *****"),
+        (
+            mock_cli_arguments(["-o", "org"]),
+            "Either the --organization or the --activationkey option is missing. You can't use one without the other.",
+        ),
+        (
+            mock_cli_arguments(["-k", "key"]),
+            "Either the --organization or the --activationkey option is missing. You can't use one without the other.",
+        ),
+    ),
+)
+def test_org_activation_key_specified(argv, message, monkeypatch, caplog):
+    tool_opts.__init__()
+    monkeypatch.setattr(sys, "argv", argv)
+
+    try:
+        convert2rhel.toolopts.CLI()
+    except SystemExit:
+        # Don't care about the exception, focus on output message
+        pass
+    assert message in caplog.text

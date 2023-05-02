@@ -2,17 +2,15 @@ import json
 import os
 
 import jsonschema
+import pytest
 
 
 def _load_json_schema(path):
     """Load the JSON schema from the system."""
     assert os.path.exists(path)
 
-    # Python2 doesn't have the nice `with` syntax.
-    handler = open(path, "r")
-    data = json.load(handler)
-    handler.close()
-    return data
+    with open(path, mode="r") as handler:
+        return json.load(handler)
 
 
 C2R_MIGRATION_RESULTS_SCHEMA = _load_json_schema(path="artifacts/c2r_migration_results_schema.json")
@@ -22,6 +20,7 @@ C2R_MIGRATION_RESULTS = "/etc/migration-results"
 C2R_RHSM_CUSTOM_FACTS = "/etc/rhsm/facts/convert2rhel.facts"
 
 
+@pytest.mark.flag_system_as_converted
 def test_flag_system_as_converted(shell):
     """Test if the breadcrumbs file was created and corresponds to the JSON schema."""
 

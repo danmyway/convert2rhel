@@ -84,17 +84,21 @@ def main():
         loggerinst.task("Prepare: Show Red Hat software EULA")
         show_eula()
 
+        loggerinst.task("Prepare: Inform about telemetry")
+        breadcrumbs.breadcrumbs.print_data_collection()
+
         # gather system information
         loggerinst.task("Prepare: Gather system information")
         systeminfo.system_info.resolve_system_info()
         systeminfo.system_info.print_system_information()
+
         breadcrumbs.breadcrumbs.collect_early_data()
 
         loggerinst.task("Prepare: Clear YUM/DNF version locks")
         pkghandler.clear_versionlock()
 
         loggerinst.task("Prepare: Clean yum cache metadata")
-        pkghandler.clean_yum_metadata()
+        pkgmanager.clean_yum_metadata()
 
         # check the system prior the conversion (possible inhibit)
         checks.perform_system_checks()
@@ -123,18 +127,21 @@ def main():
         process_phase = ConversionPhase.POST_PONR_CHANGES
         post_ponr_conversion()
 
-        loggerinst.task("Final: RPM files modified by the conversion")
+        loggerinst.task("Final: Show RPM files modified by the conversion")
         systeminfo.system_info.modified_rpm_files_diff()
 
-        loggerinst.task("Final: Updating GRUB2 configuration")
+        loggerinst.task("Final: Update GRUB2 configuration")
         grub.update_grub_after_conversion()
 
         loggerinst.task("Final: Remove temporary folder %s" % utils.TMP_DIR)
         utils.remove_tmp_dir()
 
+        loggerinst.task("Final: Check kernel boot files")
+        checks.check_kernel_boot_files()
+
         breadcrumbs.breadcrumbs.finish_collection(success=True)
 
-        loggerinst.task("Final: Updating RHSM custom facts")
+        loggerinst.task("Final: Update RHSM custom facts")
         subscription.update_rhsm_custom_facts()
 
         loggerinst.info("\nConversion successful!\n")

@@ -26,7 +26,7 @@ from collections import namedtuple
 import pytest
 import six
 
-from convert2rhel import logger, pkgmanager, systeminfo, unit_tests, utils  # Imports unit_tests/__init__.py
+from convert2rhel import logger, systeminfo, unit_tests, utils  # Imports unit_tests/__init__.py
 from convert2rhel.systeminfo import RELEASE_VER_MAPPING, Version, system_info
 from convert2rhel.toolopts import tool_opts
 from convert2rhel.unit_tests import is_rpm_based_os
@@ -163,7 +163,7 @@ class TestSysteminfo(unittest.TestCase):
         # Check that rpm -Va is executed (default) and stored into the specific file.
         tool_opts.no_rpm_va = False
         system_info.generate_rpm_va()
-        self.assertTrue(utils.run_subprocess.called > 0)
+        self.assertGreater(utils.run_subprocess.called, 0)
         self.assertEqual(utils.run_subprocess.used_args[0][0], ["rpm", "-Va"])
         self.assertTrue(os.path.isfile(self.rpmva_output_file))
         self.assertEqual(utils.get_file_content(self.rpmva_output_file), "rpmva\n")
@@ -181,9 +181,7 @@ class TestSysteminfo(unittest.TestCase):
     def test_get_system_version(self):
         Version = namedtuple("Version", ["major", "minor"])
         versions = {
-            "Oracle Linux Server release 6.10": Version(6, 10),
             "Oracle Linux Server release 7.8": Version(7, 8),
-            "CentOS release 6.10 (Final)": Version(6, 10),
             "CentOS Linux release 7.6.1810 (Core)": Version(7, 6),
             "CentOS Linux release 8.1.1911 (Core)": Version(8, 1),
         }
@@ -297,10 +295,6 @@ def test_check_internet_access(side_effect, expected, message, monkeypatch, capl
 @pytest.mark.parametrize(
     ("version_major", "command_output", "expected_command", "expected_output"),
     (
-        (6, "messagebus: (pid  1315) is running...\n", ["/sbin/service", "messagebus", "status"], True),
-        (6, "messagebus: unrecognized service\n", ["/sbin/service", "messagebus", "status"], False),
-        (6, "", ["/sbin/service", "messagebus", "status"], False),
-        (6, "master status unknown due to insufficient privileges.", ["/sbin/service", "messagebus", "status"], False),
         (7, "ActiveState=active\n", ["/usr/bin/systemctl", "show", "-p", "ActiveState", "dbus"], True),
         (7, "ActiveState=reloading\n", ["/usr/bin/systemctl", "show", "-p", "ActiveState", "dbus"], False),
         (7, "ActiveState=inactive\n", ["/usr/bin/systemctl", "show", "-p", "ActiveState", "dbus"], False),
@@ -394,7 +388,6 @@ def test_corresponds_to_rhel_eus_release(major, minor, expected):
     ("system_release_content", "expected"),
     (
         ("CentOS Linux release 8.1.1911 (Core)", "Core"),
-        ("CentOS release 6.10 (Final)", "Final"),
         ("Oracle Linux Server release 7.8", None),
     ),
 )
@@ -404,7 +397,7 @@ def test_get_system_distribution_id(system_release_content, expected):
 
 @centos8
 def test_get_system_distribution_id_default_system_release_content(pretend_os):
-    assert system_info._get_system_distribution_id() == None
+    assert system_info._get_system_distribution_id() is None
 
 
 @pytest.mark.parametrize(

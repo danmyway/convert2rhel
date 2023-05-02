@@ -27,8 +27,6 @@ import dbus.exceptions
 import pytest
 import six
 
-from six.moves import urllib
-
 from convert2rhel import backup, pkghandler, subscription, toolopts, unit_tests, utils
 from convert2rhel.systeminfo import system_info
 from convert2rhel.unit_tests import GetLoggerMocked, get_pytest_marker, run_subprocess_side_effect
@@ -255,6 +253,25 @@ class TestSubscription(unittest.TestCase):
         def __call__(self, msg):
             self.msg += "%s\n" % msg
 
+
+    @unit_tests.mock(logging.Logger, "info", LogMocked())
+    @unit_tests.mock(logging.Logger, "warning", LogMocked())
+    @unit_tests.mock(utils, "ask_to_continue", PromptUserMocked())
+    @unit_tests.mock(subscription, "get_avail_repos", lambda: ["rhel_x", "rhel_y"])
+    def test_check_needed_repos_availability(self):
+        subscription.check_needed_repos_availability(["rhel_x"])
+        self.assertIn("Needed RHEL repositories are available.", logging.Logger.info.msg)
+
+        subscription.check_needed_repos_availability(["rhel_z"])
+        self.assertIn("rhel_z repository is not available", logging.Logger.warning.msg)
+
+    @unit_tests.mock(logging.Logger, "warning", LogMocked())
+    @unit_tests.mock(utils, "ask_to_continue", PromptUserMocked())
+    @unit_tests.mock(subscription, "get_avail_repos", lambda: [])
+    def test_check_needed_repos_availability_no_repo_available(self):
+        subscription.check_needed_repos_availability(["rhel"])
+        self.assertIn("rhel repository is not available", logging.Logger.warning.msg)
+
     @unit_tests.mock(pkghandler, "get_installed_pkg_objects", lambda _: [namedtuple("Pkg", ["name"])("submgr")])
     @unit_tests.mock(pkghandler, "print_pkg_info", lambda x: None)
     @unit_tests.mock(utils, "ask_to_continue", PromptUserMocked())
@@ -284,9 +301,7 @@ class TestSubscription(unittest.TestCase):
         subscription.remove_original_subscription_manager()
 
         self.assertEqual(len(subscription.loggerinst.info_msgs), 2)
-        self.assertTrue(
-            "No packages related to subscription-manager installed." in subscription.loggerinst.info_msgs[-1]
-        )
+        self.assertIn("No packages related to subscription-manager installed.", subscription.loggerinst.info_msgs[-1])
 
 
 @pytest.fixture
@@ -523,36 +538,20 @@ class TestRegisterSystem(object):
         assert len(mocked_rhsm_call_blocking.call_args_list) == 1
         assert "CRITICAL" not in [rec.levelname for rec in caplog.records]
 
-    @pytest.mark.parametrize(
-        ("rhel_major_version", "expected_message"),
-        (
-            (6, "Skipping RHSM service shutdown on CentOS Linux 6."),
-            (7, "RHSM service stopped."),
-        ),
-    )
-    def test_stop_rhsm(self, caplog, monkeypatch, global_system_info, rhel_major_version, expected_message):
+    def test_stop_rhsm(self, caplog, monkeypatch, global_system_info):
         monkeypatch.setattr(subscription, "system_info", global_system_info)
-        global_system_info.version = Version(rhel_major_version, 10)
+        global_system_info.version = Version(7, 9)
         global_system_info.name = "CentOS Linux"
 
         run_subprocess_mock = mock.Mock(return_value=("Success", 0))
         monkeypatch.setattr(utils, "run_subprocess", run_subprocess_mock)
 
         assert subscription._stop_rhsm() is None
-        assert caplog.records[-1].message == expected_message
+        assert caplog.records[-1].message == "RHSM service stopped."
 
-    @pytest.mark.parametrize(
-        "rhel_major_version",
-        (
-            # 6 currently doesn't stop rhsm-service.  Revisit if we get host
-            # already registered errors
-            # 6,
-            7,
-        ),
-    )
-    def test_stop_rhsm_failure(self, caplog, monkeypatch, global_system_info, rhel_major_version):
+    def test_stop_rhsm_failure(self, caplog, monkeypatch, global_system_info):
         monkeypatch.setattr(subscription, "system_info", global_system_info)
-        global_system_info.version = Version(rhel_major_version, 10)
+        global_system_info.version = Version(7, 9)
 
         run_subprocess_mock = mock.Mock(return_value=("Failure", 1))
         monkeypatch.setattr(utils, "run_subprocess", run_subprocess_mock)
@@ -644,7 +643,7 @@ class TestRegistrationCommand(object):
     def test_instantiate_failures(self, registration_kwargs, error_message):
         """Test various failures instantiating RegistrationCommand."""
         with pytest.raises(ValueError, match=error_message):
-            cmd = subscription.RegistrationCommand(**registration_kwargs)
+            subscription.RegistrationCommand(**registration_kwargs)
 
     @pytest.mark.parametrize(
         "registration_kwargs",
@@ -701,11 +700,6 @@ class TestRegistrationCommand(object):
     @pytest.mark.parametrize(
         "registration_kwargs, prompt_input",
         (
-            # activation_key and not org
-            (
-                {"activation_key": "0xDEADBEEF"},
-                {"Organization: ": "Local Organization"},
-            ),
             # no activation_key no password
             (
                 {"username": "me_myself_and_i"},
@@ -740,9 +734,6 @@ class TestRegistrationCommand(object):
 
         registration_cmd = subscription.RegistrationCommand.from_tool_opts(tool_opts)
 
-        if "Organization: " in prompt_input:
-            assert registration_cmd.org == prompt_input["Organization: "]
-
         if "Password: " in prompt_input:
             assert registration_cmd.password == prompt_input["Password: "]
 
@@ -752,16 +743,6 @@ class TestRegistrationCommand(object):
         # assert that we prompted the user the number of times that we expected
         assert fake_prompt_user.call_count == len(prompt_input)
 
-    def test_from_tool_opts_activation_key_empty_string(self, tool_opts, monkeypatch):
-        monkeypatch.setattr(utils, "prompt_user", PromptUserLoopMocked())
-        tool_opts.activation_key = "activation_key"
-
-        registration_cmd = subscription.RegistrationCommand.from_tool_opts(tool_opts)
-
-        assert registration_cmd.activation_key == "activation_key"
-        assert registration_cmd.org == "test"
-        assert utils.prompt_user.called == {"Organization: ": 2}
-
     def test_from_tool_opts_username_empty_string(self, tool_opts, monkeypatch):
         monkeypatch.setattr(utils, "prompt_user", PromptUserLoopMocked())
 
@@ -770,81 +751,6 @@ class TestRegistrationCommand(object):
         assert registration_cmd.username == "test"
         assert registration_cmd.password == "test"
         assert utils.prompt_user.called == {"Username: ": 2, "Password: ": 2}
-
-    @pytest.mark.parametrize(
-        "registration_kwargs",
-        (
-            {
-                "rhsm_hostname": "localhost",
-                "activation_key": "0xDEADBEEF",
-                "org": "Local Organization",
-            },
-            {
-                "rhsm_hostname": "localhost",
-                "rhsm_port": "8800",
-                "rhsm_prefix": "/rhsm",
-                "activation_key": "0xDEADBEEF",
-                "org": "Local Organization",
-            },
-            {
-                "rhsm_hostname": "localhost",
-                "rhsm_port": "8800",
-                "rhsm_prefix": "rhsm",
-                "org": "Local Organization",
-                "username": "me_myself_and_i",
-                "password": "a password",
-            },
-            {
-                "username": "me_myself_and_i",
-                "password": "a password",
-            },
-        ),
-    )
-    def test_args(self, registration_kwargs):
-        """Test that the argument list is generated correctly."""
-        reg_cmd = subscription.RegistrationCommand(**registration_kwargs)
-
-        args_list = reg_cmd.args
-
-        # Assert that these are always added
-        assert args_list[0] == "register"
-        assert "--force" in args_list
-
-        # Assert that password was not added to the args_list
-        assert len([arg for arg in args_list if "password" in arg]) == 0
-
-        # Assert the other args were added
-        if (
-            "rhsm_prefix" in registration_kwargs
-            and "rhsm_port" in registration_kwargs
-            and "rhsm_prefix" in registration_kwargs
-        ):
-            server_url = urllib.parse.urljoin(
-                "https://{rhsm_hostname}:{rhsm_port}".format(**registration_kwargs),
-                "{rhsm_prefix}".format(**registration_kwargs),
-            )
-            assert "--serverurl={0}".format(server_url) in args_list
-        elif "rhsm_hostname" in registration_kwargs:
-            assert "--serverurl=https://{rhsm_hostname}".format(**registration_kwargs) in args_list
-
-        if "activation_key" in registration_kwargs:
-            assert "--activationkey={activation_key}".format(**registration_kwargs) in args_list
-
-        if "org" in registration_kwargs:
-            assert "--org={org}".format(**registration_kwargs) in args_list
-
-        if "username" in registration_kwargs:
-            assert "--username={username}".format(**registration_kwargs) in args_list
-
-        expected_length = len(registration_kwargs) + 2
-        if "password" in registration_kwargs:
-            expected_length -= 1
-        if "rhsm_port" in registration_kwargs:
-            expected_length -= 1
-        if "rhsm_prefix" in registration_kwargs:
-            expected_length -= 1
-
-        assert len(args_list) == expected_length
 
     @pytest.mark.parametrize(
         ("rhsm_hostname", "rhsm_port", "rhsm_prefix", "expected"),
@@ -876,49 +782,89 @@ class TestRegistrationCommand(object):
         )
         assert reg_cmd.connection_opts == expected
 
-    def test_calling_registration_command_activation_key(self, monkeypatch, mocked_rhsm_call_blocking):
-        reg_cmd = subscription.RegistrationCommand(activation_key="0xDEADBEEF", org="Local Organization")
-        reg_cmd()
-
-        args = (
-            "Local Organization",
-            ["0xDEADBEEF"],
-            {"force": True},
-            {},
-            "C",
+    @pytest.mark.parametrize(
+        (
+            "organization",
+            "activation_key",
+            "username",
+            "password",
+            "register_var",
+            "register_signature",
+            "organization_log",
+        ),
+        (
+            (
+                "Local Organization",
+                "0xDEADBEEF",
+                None,
+                None,
+                "RegisterWithActivationKeys",
+                "sasa{sv}a{sv}s",
+                "Organization: *****",
+            ),
+            (
+                "Local Organization",
+                None,
+                "user_name",
+                "pass_word",
+                "Register",
+                "sssa{sv}a{sv}s",
+                "Organization: *****",
+            ),
+            (None, None, "user_name", "pass_word", "Register", "sssa{sv}a{sv}s", None),
+        ),
+    )
+    def test_calling_registration_command(
+        self,
+        organization,
+        activation_key,
+        username,
+        password,
+        register_var,
+        register_signature,
+        organization_log,
+        monkeypatch,
+        mocked_rhsm_call_blocking,
+        caplog,
+    ):
+        reg_cmd = subscription.RegistrationCommand(
+            username=username, password=password, org=organization, activation_key=activation_key
         )
+
+        reg_cmd()
+        if password:
+            args = (
+                organization or "",
+                username,
+                password,
+                {"force": True},
+                {},
+                "C",
+            )
+
+        else:
+            args = (
+                organization or "",
+                [activation_key],
+                {"force": True},
+                {},
+                "C",
+            )
+
         mocked_rhsm_call_blocking.assert_called_once_with(
             "com.redhat.RHSM1",
             "/com/redhat/RHSM1/Register",
             "com.redhat.RHSM1.Register",
-            "RegisterWithActivationKeys",
-            "sasa{sv}a{sv}s",
+            register_var,
+            register_signature,
             args,
             timeout=subscription.REGISTRATION_TIMEOUT,
         )
 
-    def test_calling_registration_command_password(self, monkeypatch, mocked_rhsm_call_blocking):
-        reg_cmd = subscription.RegistrationCommand(username="me_myself_and_i", password="a password")
-
-        reg_cmd()
-
-        args = (
-            "",
-            "me_myself_and_i",
-            "a password",
-            {"force": True},
-            {},
-            "C",
-        )
-        mocked_rhsm_call_blocking.assert_called_once_with(
-            "com.redhat.RHSM1",
-            "/com/redhat/RHSM1/Register",
-            "com.redhat.RHSM1.Register",
-            "Register",
-            "sssa{sv}a{sv}s",
-            args,
-            timeout=subscription.REGISTRATION_TIMEOUT,
-        )
+        if organization_log is None:
+            assert "Organization: " not in caplog.text
+        else:
+            assert organization_log in caplog.text
 
     def test_calling_registration_command_with_connection_opts(self, monkeypatch, mocked_rhsm_call_blocking):
         reg_cmd = subscription.RegistrationCommand(
@@ -1094,17 +1040,6 @@ class TestDownloadRHSMPkgs(object):
             "pkgs_to_download",
         ),
         (
-            (
-                (6, 0),
-                False,
-                frozenset(
-                    (
-                        "subscription-manager",
-                        "subscription-manager-rhsm-certificates",
-                        "subscription-manager-rhsm",
-                    )
-                ),
-            ),
             (
                 (7, 0),
                 False,
@@ -1590,6 +1525,15 @@ def test_update_rhsm_custom_facts_no_rhsm(global_tool_opts, caplog, monkeypatch)
 
     subscription.update_rhsm_custom_facts()
     assert "Skipping updating RHSM custom facts." in caplog.records[-1].message
+
+
+def test_update_rhsm_custom_facts_disable_telemetry(monkeypatch, caplog):
+    message = "Telemetry disabled, skipping RHSM facts upload."
+    monkeypatch.setenv("CONVERT2RHEL_DISABLE_TELEMETRY", "1")
+
+    subscription.update_rhsm_custom_facts()
+
+    assert message in caplog.records[-1].message
 
 
 MOCK_LIST_AVAILABLE_SUBS_OUTPUT = """\

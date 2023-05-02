@@ -33,7 +33,7 @@ from convert2rhel.utils import run_subprocess
 CHECK_DBUS_STATUS_RETRIES = 3
 
 # The address that will be used to check if there is a internet connection.
-CHECK_INTERNET_CONNECTION_ADDRESS = "http://static.redhat.com/test/rhel-networkmanager.txt"
+CHECK_INTERNET_CONNECTION_ADDRESS = "https://static.redhat.com/test/rhel-networkmanager.txt"
 
 # Allowed conversion paths to RHEL. We want to prevent a conversion and minor
 # version update at the same time.
@@ -66,7 +66,7 @@ class SystemInfo(object):
         self.name = None
         # Single-word lowercase identificator of the system (e.g. oracle)
         self.id = None  # pylint: disable=C0103
-        # Major and minor version of the operating system (e.g. version.major == 6, version.minor == 10)
+        # Major and minor version of the operating system (e.g. version.major == 8, version.minor == 7)
         self.version = None
         # Platform architecture
         self.arch = None
@@ -75,11 +75,11 @@ class SystemInfo(object):
         # Fingerprints of RHEL GPG keys available at:
         #  https://access.redhat.com/security/team/key/
         self.fingerprints_rhel = [
-            # RHEL 6/7: RPM-GPG-KEY-redhat-release
+            # RPM-GPG-KEY-redhat-release
             "199e2f91fd431d51",
-            # RHEL 6/7: RPM-GPG-KEY-redhat-legacy-release
+            # RPM-GPG-KEY-redhat-legacy-release
             "5326810137017186",
-            # RHEL 6/7: RPM-GPG-KEY-redhat-legacy-former
+            # RPM-GPG-KEY-redhat-legacy-former
             "219180cddb42a60e",
         ]
         # Packages to be removed before the system conversion
@@ -149,9 +149,7 @@ class SystemInfo(object):
         """Return a namedtuple with major and minor elements, both of an int type.
 
         Examples:
-        Oracle Linux Server release 6.10
         Oracle Linux Server release 7.8
-        CentOS release 6.10 (Final)
         CentOS Linux release 7.6.1810 (Core)
         CentOS Linux release 8.1.1911 (Core)
         """
@@ -174,9 +172,7 @@ class SystemInfo(object):
                 the example below.
 
         Examples:
-        Oracle Linux Server release 6.10     <- None
         Oracle Linux Server release 7.8      <- None
-        CentOS release 6.10 (Final)          <- Final
         CentOS Linux release 7.6.1810 (Core) <- Core
         CentOS Linux release 8.1.1911 (Core) <- Core
 
@@ -423,10 +419,7 @@ class SystemInfo(object):
         status = False
 
         while retries < CHECK_DBUS_STATUS_RETRIES:
-            if self.version.major <= 6:
-                status = _is_sysv_managed_dbus_running()
-            else:
-                status = _is_systemd_managed_dbus_running()
+            status = _is_systemd_managed_dbus_running()
 
             if status is not None:
                 # We know that DBus is definitely running or stopped
@@ -482,24 +475,6 @@ def _get_original_releasever():
         original_releasever = db.conf.releasever
 
     return str(original_releasever)
-
-
-def _is_sysv_managed_dbus_running():
-    """Get DBus status from SysVinit compatible systems."""
-    # None means the status should be retried because we weren't sure if it is turned off.
-    running = None
-    output, _ret_code = utils.run_subprocess(["/sbin/service", "messagebus", "status"])
-    for line in output.splitlines():
-        if line.startswith("messagebus"):
-            if "running" in line:
-                running = True
-                break
-
-            # Note: SysV has a stopped status but I don't think that toggles until after
-            # the service is running so we could be caught in the case where the service
-            # is starting if we don't retry.
-
-    return running
 
 
 def _is_systemd_managed_dbus_running():

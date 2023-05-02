@@ -9,7 +9,7 @@
 %endif
 
 Name:           convert2rhel
-Version:        1.1
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        Automates the conversion of RHEL derivative distributions to RHEL
 
@@ -21,10 +21,14 @@ BuildArch:      noarch
 BuildRequires:  python%{python_pkgversion}-devel
 BuildRequires:  python%{python_pkgversion}-setuptools
 BuildRequires:  python%{python_pkgversion}-six
+BuildRequires:  argparse-manpage
 %if 0%{?rhel} && 0%{?rhel} >= 8
 BuildRequires:  python3-pexpect
 # rpm is being imported through utils.py
 BuildRequires:  python3-rpm
+# Disallow packages like python38-rpm-macros or python39-rpm-macros to be installed when building the package.
+# Having them installed would expand the 'python3_pkgversion' macro to 38 or 39 instead of the expected 3.
+BuildConflicts: python-modular-rpm-macros
 %endif
 %if 0%{?rhel} && 0%{?rhel} <= 7
 BuildRequires:  pexpect
@@ -63,7 +67,7 @@ Requires:       grub2-tools
 The purpose of the convert2rhel tool is to provide an automated way of
 converting the installed other-than-RHEL OS distribution to Red Hat Enterprise
 Linux (RHEL). The tool replaces all the original OS-signed packages with the
-RHEL ones. Available are conversions of CentOS Linux 6/7/8, Oracle Linux 6/7/8
+RHEL ones. Available are conversions of CentOS Linux 7/8, Oracle Linux 7/8
 and Scientific Linux 7 to the respective major version of RHEL.
 
 %prep
@@ -107,11 +111,6 @@ install -m 0600 config/convert2rhel.ini %{buildroot}%{_sysconfdir}/convert2rhel.
 
 %files
 
-%if 0%{?rhel} && 0%{?rhel} <= 6
-# without this on CentOS Linux/OL 6, rpmlint gives an error "E: files-attr-not-set"
-%defattr(-,root,root,-)
-%endif
-
 %{_bindir}/%{name}
 %{_datadir}/%{name}/
 %{_sharedstatedir}/%{name}/
@@ -124,6 +123,26 @@ install -m 0600 config/convert2rhel.ini %{buildroot}%{_sysconfdir}/convert2rhel.
 %attr(0644,root,root) %{_mandir}/man8/%{name}.8*
 
 %changelog
+* Wed Feb 22 2023 Eric Gustavsson <egustavs@redhat.com> 1.2
+- Remove RHEL 6 conversion capability
+- Check for kernel boot files after conversion
+- Allow overriding the kernel module inhibitor
+- Remove shim-x64 related workaround for Oracle Linux 7
+- Always print the RHSM rollback task "title"
+- Verify both RHSM org and key is passed
+- Improve logging and handling of RHSM facts
+- Change the debug FILE label in log file to DEBUG
+- Add progress indicators for the main package replacement
+- Man/help page to mention config file location
+- Enable opt out for telemetry
+- Hide RHSM username and org from logs and breadcrumbs
+- Fix conversion with "LANGUAGE" envar
+- Deduplicate log messages about imported keys
+- Update address for internet connection check
+- Fix a traceback when checking if the latest kernel is loaded
+- Make TASK log messages consistent
+- Fix partition number usage when creating RHEL UEFI bootloader entry
+
 * Wed Nov 30 2022 Eric Gustavsson <egustavs@redhat.com> 1.1
 - Add RHEL 8.6 among the supported EUS minor versions
 - Merge yum transactions into a single one to improve stability
