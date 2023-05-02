@@ -88,7 +88,7 @@ def repositories(shell):
         assert shell(f"mv /usr/share/convert2rhel/repos/* {BACKUP_DIR_EUS}").returncode == 0
 
     # Since we are moving all repos away, we need to bypass kernel check
-    os.environ["CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK"] = "1"
+    os.environ["CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK"] = "1"
 
     yield
 
@@ -100,7 +100,7 @@ def repositories(shell):
         assert shell(f"mv {BACKUP_DIR_EUS}/* /usr/share/convert2rhel/repos/").returncode == 0
         assert shell(f"rm -rf {BACKUP_DIR_EUS}")
     # Remove the envar skipping the kernel check
-    del os.environ["CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK"]
+    del os.environ["CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK"]
 
 
 @pytest.mark.test_unsuccessful_satellite_registration

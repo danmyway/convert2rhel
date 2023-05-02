@@ -34,7 +34,7 @@ def test_skip_kernel_check(shell, convert2rhel):
             c2r.expect("Could not find any kernel-core from repositories to compare against the loaded kernel.")
     assert c2r.exitstatus != 0
 
-    os.environ["CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK"] = "1"
+    os.environ["CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK"] = "1"
 
     with convert2rhel(
         "--no-rpm-va --serverurl {} --username {} --password {} --pool {} --debug".format(
@@ -48,7 +48,7 @@ def test_skip_kernel_check(shell, convert2rhel):
         c2r.expect("Continue with the system conversion?")
         c2r.sendline("y")
 
-        c2r.expect("Detected 'CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK' environment variable")
+        c2r.expect("Detected 'CONVERT2RHEL_SKIP_KERNEL_CURRENCY_CHECK' environment variable")
         c2r.sendcontrol("c")
     assert c2r.exitstatus != 0
 
