@@ -32,7 +32,7 @@ def test_run_conversion_using_custom_repos(shell, convert2rhel):
         # from Testing Farm
         shell("rm /etc/yum.repos.d/copr_build-convert2rhel-1.repo")
 
-    os.environ["CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK"] = "1"
+    os.environ["CONVERT2RHEL_INCOMPLETE_ROLLBACK"] = "1"
     os.environ["CONVERT2RHEL_UNSUPPORTED_SKIP_KERNEL_CURRENCY_CHECK"] = "1"
 
     with convert2rhel("-y --no-rpm-va --disable-submgr {} --debug".format(enable_repo_opt)) as c2r:
