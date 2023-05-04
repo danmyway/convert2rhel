@@ -294,3 +294,58 @@ def test_disable_data_collection(shell, convert2rhel):
 
     # Remove envar disabling telemetry.
     del os.environ["CONVERT2RHEL_DISABLE_TELEMETRY"]
+
+
+@pytest.fixture(scope="function")
+def repos(shell):
+    """
+    Fixture to move away all the repositories and restore after the test.
+    """
+
+    backup_dir = "/tmp/repobckp"
+    repos_dir = "/etc/yum.repos.d"
+    shell(f"mkdir {backup_dir}")
+    # Move all the repos away
+    shell(f"mv {repos_dir}/* {backup_dir}/")
+
+    yield
+
+    # Restore repositories and remove the backup_dir
+    shell(f"mv {backup_dir}/* {repos_dir}/ && rm -rf {backup_dir}")
+
+
+@pytest.fixture(scope="function")
+def incomplete_rollback_envar():
+    """
+    Fixture to set the 'CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK' envar
+    and delete after the test.
+    """
+    os.environ["CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK"] = "1"
+
+    yield
+
+    del os.environ["CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK"]
+
+
+@pytest.mark.test_deprecated_envar_incomplete_rollback
+def test_deprecated_envar_incomplete_rollback(shell, convert2rhel, repos):
+    """
+    This test verifies it's still allowed to use the deprecated
+    envar CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK".
+    Move all repositories away prior to the conversion to simulate
+    inability to back up the packages by convert2rhel.
+    """
+    with convert2rhel("--debug --no-rpm-va") as c2r:
+        # We need to get past the data collection acknowledgement.
+        c2r.sendline("y")
+        # Verify the user is not asked to use the new envar, when the old is in use
+        assert (
+            not c2r.expect("you can set the environment variable 'CONVERT2RHEL_INCOMPLETE_ROLLBACK=1'", timeout=120)
+            == 0
+        )
+        assert (
+            c2r.expect("You are using the deprecated 'CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK'", timeout=120) == 0
+        )
+        assert c2r.expect("environment variable detected, continuing conversion.", timeout=120) == 0
+
+    assert c2r.exitstatus != 0

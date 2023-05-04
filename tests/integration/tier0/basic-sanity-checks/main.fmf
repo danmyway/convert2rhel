@@ -154,3 +154,25 @@ tag+:
             - disable-data-collection
         test: |
           pytest -svv -m test_disable_data_collection
+
+
+/deprecated_envars:
+    summary+: |
+        Deprecated environment variables allowed
+    description+: |
+        Verify that using deprecated variables is allowed, handled like
+        the new envar is used and the conversion continues.
+    tag+:
+        - deprecated-envars
+    /incomplete_rollback_envar:
+        summary+: |
+            CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK allowed
+        description+: |
+            This test verifies it's still allowed to use the deprecated
+            envar CONVERT2RHEL_UNSUPPORTED_INCOMPLETE_ROLLBACK".
+            Move all repositories away prior to the conversion to simulate
+            inability to back up the packages by convert2rhel.
+        tag+:
+            - incomplete-rollback-envar
+        test: |
+          pytest -svv -m test_deprecated_envar_incomplete_rollback
