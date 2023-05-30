@@ -14,6 +14,7 @@ import click
 import pexpect
 import pytest
 
+from dotenv import dotenv_values
 from envparse import env
 
 
@@ -22,7 +23,10 @@ try:
 except ImportError:
     from pathlib2 import Path
 
-logging.basicConfig(level="DEBUG" if env.str("DEBUG") else "INFO", stream=sys.stderr)
+# Load variables from .env file
+env_vars = dotenv_values("/tmp/.env")
+
+logging.basicConfig(level="DEBUG" if env_vars["DEBUG"] else "INFO", stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
 SATELLITE_URL = "satellite.sat.engineering.redhat.com"
@@ -30,6 +34,8 @@ SATELLITE_PKG_URL = "https://satellite.sat.engineering.redhat.com/pub/katello-ca
 SATELLITE_PKG_DST = "/usr/share/convert2rhel/subscription-manager/katello-ca-consumer-latest.noarch.rpm"
 
 SYSTEM_RELEASE_ENV = os.environ["SYSTEM_RELEASE_ENV"]
+
+SECRETS_FILE = "https://gitlab.cee.redhat.com/oamg/convert2rhel/convert2rhel-secrets/-/raw/main/.env"
 
 
 @pytest.fixture()
@@ -372,3 +378,10 @@ def missing_centos_release_workaround(system_release, shell):
         rpm_output = shell("rpm -q centos-linux-release").output
         if "not installed" in rpm_output:
             shell("yum install -y --releasever=8 centos-linux-release")
+
+
+@pytest.fixture()
+def credentials():
+    credential_values = env_vars
+
+    return credential_values

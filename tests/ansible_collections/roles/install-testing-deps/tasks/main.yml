@@ -24,5 +24,6 @@
       - "dataclasses"
       - "jsonschema"
       - "psutil"
+      - "python-dotenv"
     # Use pip3 in case pip was installed via rpm package on this system
     executable: pip3

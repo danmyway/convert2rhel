@@ -4,12 +4,12 @@ from envparse import env
 
 
 @pytest.mark.activation_key_conversion
-def test_activation_key_conversion(convert2rhel):
+def test_activation_key_conversion(convert2rhel, credentials):
     with convert2rhel(
         "-y --no-rpm-va --serverurl {} -k {} -o {} --debug".format(
-            env.str("RHSM_SERVER_URL"),
-            env.str("RHSM_KEY"),
-            env.str("RHSM_ORG"),
+            credentials.get("RHSM_SERVER_URL"),
+            credentials.get("RHSM_KEY"),
+            credentials.get("RHSM_ORG"),
         )
     ) as c2r:
         c2r.expect("Conversion successful!")
