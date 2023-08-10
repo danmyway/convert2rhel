@@ -345,7 +345,7 @@ class ActionMessage(ActionMessageBase):
     A class that defines the contents and rules for messages set through :meth:`Action.add_message`.
     """
 
-    def __init__(self, level=None, id=None, title=None, description=None, diagnosis="", remediation=""):
+    def __init__(self, level=None, id=None, title=None, description=None, diagnosis=None, remediation=None):
         if not (id and level and title and description):
             raise InvalidMessageError("Messages require id, level, title and description fields")
 
