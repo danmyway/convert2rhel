@@ -772,7 +772,7 @@ def format_action_status_message(status_code, action_id, id, result):
     :rtype: str
     """
     level_name = _STATUS_NAME_FROM_CODE[status_code]
-    template = "({LEVEL}) {ACTION_ID}"
+    template = "({LEVEL}) {ACTION_ID}.{ID}:"
     default_message = "[No further information given]"
 
     # Success results doesn't need to have id, title or anything else. Instead,
@@ -780,12 +780,8 @@ def format_action_status_message(status_code, action_id, id, result):
     # information given` and return earlier to skip the other conditionals
     # checks.
     if status_code == STATUS_CODE["SUCCESS"]:
-        template += ": {MESSAGE}"
-        return template.format(LEVEL=level_name, ACTION_ID=action_id, MESSAGE=default_message)
-
-    # Compose message with the required fields to give a more information
-    # message to the user.
-    template += ".{ID}:"
+        template += " {MESSAGE}"
+        return template.format(ID=id, LEVEL=level_name, ACTION_ID=action_id, MESSAGE=default_message)
 
     title = result["title"]
     template += " {TITLE}\n"
