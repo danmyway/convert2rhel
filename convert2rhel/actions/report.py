@@ -102,7 +102,7 @@ def wrap_paragraphs(text, width=70, **kwargs):
     return [
         line
         for para in text.splitlines()
-        for line in textwrap.wrap(para, width, subsequent_indent=" ", **kwargs) or [""]
+        for line in textwrap.wrap(para, width, subsequent_indent="    ", **kwargs) or [""]
     ]
 
 
