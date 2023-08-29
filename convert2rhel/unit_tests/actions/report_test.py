@@ -102,7 +102,7 @@ def test_summary_as_json(results, expected, tmpdir):
             },
             True,
             [
-                "(WARNING) PreSubscription::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(WARNING) PreSubscription::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
                 "(SUCCESS) PreSubscription::SUCCESS - [No further information given]",
             ],
         ),
@@ -143,8 +143,8 @@ def test_summary_as_json(results, expected, tmpdir):
             True,
             [
                 "(SUCCESS) PreSubscription::SUCCESS - [No further information given]",
-                "(WARNING) PreSubscription2::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(SKIP) PreSubscription2::SKIPPED - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
+                "(WARNING) PreSubscription2::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(SKIP) PreSubscription2::SKIPPED - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
             ],
         ),
         # Test that messages that are below WARNING will not appear in
@@ -191,7 +191,7 @@ def test_summary_as_json(results, expected, tmpdir):
             },
             False,
             [
-                "(WARNING) PreSubscription::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on"
+                "(WARNING) PreSubscription::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on"
             ],
         ),
         (
@@ -239,9 +239,9 @@ def test_summary_as_json(results, expected, tmpdir):
             },
             False,
             [
-                "(SKIP) PreSubscription2::SKIPPED - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
-                "(WARNING) PreSubscription::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) PreSubscription2::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(SKIP) PreSubscription2::SKIPPED - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
+                "(WARNING) PreSubscription::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) PreSubscription2::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
             ],
         ),
         # Test all messages are displayed, SKIP and higher
@@ -290,10 +290,10 @@ def test_summary_as_json(results, expected, tmpdir):
             },
             False,
             [
-                "(OVERRIDABLE) PreSubscription2::OVERRIDABLE_ID - Overridable\n Description: Action overridable\n Diagnosis: User overridable\n Remediation: move on",
-                "(SKIP) PreSubscription1::SKIPPED - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
-                "(WARNING) PreSubscription1::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) PreSubscription2::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(OVERRIDABLE) PreSubscription2::OVERRIDABLE_ID - Overridable\n     Description: Action overridable\n     Diagnosis: User overridable\n     Remediation: move on",
+                "(SKIP) PreSubscription1::SKIPPED - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
+                "(WARNING) PreSubscription1::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) PreSubscription2::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
             ],
         ),
         (
@@ -381,14 +381,14 @@ def test_summary_as_json(results, expected, tmpdir):
             },
             False,
             [
-                "(ERROR) ErrorAction::ERROR - Error\n Description: Action error\n Diagnosis: User error\n Remediation: move on",
-                "(ERROR) TestAction::SECONDERROR - Error\n Description: Action error\n Diagnosis: User error\n Remediation: move on",
-                "(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n Description: Action overridable\n Diagnosis: User overridable\n Remediation: move on",
-                "(SKIP) SkipAction::SKIP - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
-                "(WARNING) SkipAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) OverridableAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) ErrorAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) TestAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(ERROR) ErrorAction::ERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on",
+                "(ERROR) TestAction::SECONDERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on",
+                "(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n     Description: Action overridable\n     Diagnosis: User overridable\n     Remediation: move on",
+                "(SKIP) SkipAction::SKIP - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
+                "(WARNING) SkipAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) OverridableAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) ErrorAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) TestAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
             ],
         ),
     ),
@@ -397,7 +397,6 @@ def test_summary(results, expected_results, include_all_reports, caplog):
     report.summary(results, include_all_reports, with_colors=False)
 
     for expected in expected_results:
-        print(caplog.records[-1].message)
         assert expected in caplog.records[-1].message
 
 
@@ -525,8 +524,8 @@ def test_messages_summary_with_long_message(long_message, caplog):
             },
             False,
             [
-                r"\(OVERRIDABLE\) PreSubscription1::SOME_OVERRIDABLE - Overridable\n Description: Action override\n Diagnosis: User override\n Remediation: move on",
-                r"\(SKIP\) PreSubscription2::SKIPPED - Skipped\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
+                r"\(OVERRIDABLE\) PreSubscription1::SOME_OVERRIDABLE - Overridable\n     Description: Action override\n     Diagnosis: User override\n     Remediation: move on",
+                r"\(SKIP\) PreSubscription2::SKIPPED - Skipped\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
             ],
         ),
         (
@@ -567,9 +566,9 @@ def test_messages_summary_with_long_message(long_message, caplog):
             },
             False,
             [
-                r"\(ERROR\) ErrorAction::ERROR - Error\n Description: Action error\n Diagnosis: User error\n Remediation: move on",
-                r"\(OVERRIDABLE\) OverridableAction::OVERRIDABLE - Overridable\n Description: Action override\n Diagnosis: User override\n Remediation: move on",
-                r"\(SKIP\) SkipAction::SKIP - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
+                r"\(ERROR\) ErrorAction::ERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on",
+                r"\(OVERRIDABLE\) OverridableAction::OVERRIDABLE - Overridable\n     Description: Action override\n     Diagnosis: User override\n     Remediation: move on",
+                r"\(SKIP\) SkipAction::SKIP - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
             ],
         ),
         # Message order with `include_all_reports` set to True.
@@ -622,9 +621,9 @@ def test_messages_summary_with_long_message(long_message, caplog):
             },
             True,
             [
-                r"\(ERROR\) ErrorAction::ERROR - Error\n Description: Action error\n Diagnosis: User error\n Remediation: move on",
-                r"\(OVERRIDABLE\) OverridableAction::OVERRIDABLE - Overridable\n Description: Action override\n Diagnosis: User override\n Remediation: move on",
-                r"\(SKIP\) SkipAction::SKIP - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
+                r"\(ERROR\) ErrorAction::ERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on",
+                r"\(OVERRIDABLE\) OverridableAction::OVERRIDABLE - Overridable\n     Description: Action override\n     Diagnosis: User override\n     Remediation: move on",
+                r"\(SKIP\) SkipAction::SKIP - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
                 r"\(SUCCESS\) PreSubscription::SUCCESS - \[No further information given\]",
             ],
         ),
@@ -685,9 +684,9 @@ def test_results_summary_ordering(results, include_all_reports, expected_results
             },
             False,
             [
-                "(OVERRIDABLE) PreSubscription1::SOME_OVERRIDABLE - Override\n Description: Action override\n Diagnosis: User override\n Remediation: move on",
-                "(SKIP) PreSubscription2::SKIPPED - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
-                "(WARNING) PreSubscription2::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(OVERRIDABLE) PreSubscription1::SOME_OVERRIDABLE - Override\n     Description: Action override\n     Diagnosis: User override\n     Remediation: move on",
+                "(SKIP) PreSubscription2::SKIPPED - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
+                "(WARNING) PreSubscription2::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
             ],
         ),
         (
@@ -746,11 +745,11 @@ def test_results_summary_ordering(results, include_all_reports, expected_results
             },
             False,
             [
-                "(ERROR) ErrorAction::ERROR - Error\n Description: Action error\n Diagnosis: User error\n Remediation: move on",
-                "(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n Description: Action overridable\n Diagnosis: User overridable\n Remediation: move on",
-                "(SKIP) SkipAction::SKIP - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
-                "(WARNING) SkipAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) OverridableAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(ERROR) ErrorAction::ERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on",
+                "(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n     Description: Action overridable\n     Diagnosis: User overridable\n     Remediation: move on",
+                "(SKIP) SkipAction::SKIP - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
+                "(WARNING) SkipAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) OverridableAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
             ],
         ),
         # Message order with `include_all_reports` set to True.
@@ -839,13 +838,13 @@ def test_results_summary_ordering(results, include_all_reports, expected_results
             },
             True,
             [
-                "(ERROR) ErrorAction::ERROR - Error\n Description: Action error\n Diagnosis: User error\n Remediation: move on",
-                "(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n Description: Action overridable\n Diagnosis: User overridable\n Remediation: move on",
-                "(SKIP) SkipAction::SKIP - Skip\n Description: Action skip\n Diagnosis: User skip\n Remediation: move on",
-                "(WARNING) PreSubscription::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) SkipAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) OverridableAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
-                "(WARNING) ErrorAction::WARNING_ID - Warning\n Description: Action warning\n Diagnosis: User warning\n Remediation: move on",
+                "(ERROR) ErrorAction::ERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on",
+                "(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n     Description: Action overridable\n     Diagnosis: User overridable\n     Remediation: move on",
+                "(SKIP) SkipAction::SKIP - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on",
+                "(WARNING) PreSubscription::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) SkipAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) OverridableAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
+                "(WARNING) ErrorAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on",
                 "(SUCCESS) PreSubscription::SUCCESS - [No further information given]",
             ],
         ),
@@ -893,10 +892,10 @@ def test_messages_summary_ordering(results, include_all_reports, expected_result
                     },
                 )
             },
-            "{begin}(ERROR) ErrorAction::ERROR - Error{end}\n{begin} Description: Action error{end}\n{begin} Diagnosis: User error{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(ERROR) ErrorAction::ERROR - Error\n     Description: Action error\n     Diagnosis: User error\n     Remediation: move on{end}".format(
                 begin=bcolors.FAIL, end=bcolors.ENDC
             ),
-            "{begin}(WARNING) ErrorAction::WARNING_ID - Warning{end}\n{begin} Description: Action warning{end}\n{begin} Diagnosis: User warning{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(WARNING) ErrorAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on{end}".format(
                 begin=bcolors.WARNING, end=bcolors.ENDC
             ),
         ),
@@ -923,10 +922,10 @@ def test_messages_summary_ordering(results, include_all_reports, expected_result
                     },
                 )
             },
-            "{begin}(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable{end}\n{begin} Description: Action overridable{end}\n{begin} Diagnosis: User overridable{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(OVERRIDABLE) OverridableAction::OVERRIDABLE - Overridable\n     Description: Action overridable\n     Diagnosis: User overridable\n     Remediation: move on{end}".format(
                 begin=bcolors.FAIL, end=bcolors.ENDC
             ),
-            "{begin}(WARNING) OverridableAction::WARNING_ID - Warning{end}\n{begin} Description: Action warning{end}\n{begin} Diagnosis: User warning{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(WARNING) OverridableAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on{end}".format(
                 begin=bcolors.WARNING, end=bcolors.ENDC
             ),
         ),
@@ -953,10 +952,10 @@ def test_messages_summary_ordering(results, include_all_reports, expected_result
                     },
                 )
             },
-            "{begin}(SKIP) SkipAction::SKIP - Skip{end}\n{begin} Description: Action skip{end}\n{begin} Diagnosis: User skip{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(SKIP) SkipAction::SKIP - Skip\n     Description: Action skip\n     Diagnosis: User skip\n     Remediation: move on{end}".format(
                 begin=bcolors.FAIL, end=bcolors.ENDC
             ),
-            "{begin}(WARNING) SkipAction::WARNING_ID - Warning{end}\n{begin} Description: Action warning{end}\n{begin} Diagnosis: User warning{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(WARNING) SkipAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on{end}".format(
                 begin=bcolors.WARNING, end=bcolors.ENDC
             ),
         ),
@@ -986,7 +985,7 @@ def test_messages_summary_ordering(results, include_all_reports, expected_result
             "{begin}(SUCCESS) SuccessfulAction::SUCCESS - [No further information given]{end}".format(
                 begin=bcolors.OKGREEN, end=bcolors.ENDC
             ),
-            "{begin}(WARNING) SuccessfulAction::WARNING_ID - Warning{end}\n{begin} Description: Action warning{end}\n{begin} Diagnosis: User warning{end}\n{begin} Remediation: move on{end}".format(
+            "{begin}(WARNING) SuccessfulAction::WARNING_ID - Warning\n     Description: Action warning\n     Diagnosis: User warning\n     Remediation: move on{end}".format(
                 begin=bcolors.WARNING, end=bcolors.ENDC
             ),
         ),

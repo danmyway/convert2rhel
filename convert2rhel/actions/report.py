@@ -101,11 +101,21 @@ def wrap_paragraphs(text, width=70, **kwargs):
     which is a solution to textwrap not properly respecting line breaks inside
     strings.
     """
-    return [
-        line
-        for para in text.splitlines()
-        for line in textwrap.wrap(para, width, subsequent_indent="    ", **kwargs) or [""]
-    ]
+    output = []
+    first = True
+    indent = ""
+    subsequent_indent = "    "
+    for paragraph in text.splitlines():
+        for line in textwrap.wrap(
+            paragraph, width, initial_indent=indent, subsequent_indent=subsequent_indent, **kwargs
+        ) or [""]:
+            output.append(line)
+        if first:
+            indent = subsequent_indent
+            subsequent_indent = ""
+            first = False
+
+    return "\n".join(output)
 
 
 def summary(results, include_all_reports=False, with_colors=True):
@@ -200,12 +210,10 @@ def summary(results, include_all_reports=False, with_colors=True):
             last_level = combined_result["level"]
 
         entry = format_action_status_message(combined_result["level"], message_id[0], message_id[1], combined_result)
-        paragraphs = wrap_paragraphs(entry, width=terminal_size[0])
-        for paragraph in paragraphs:
-            entry = word_wrapper.fill(paragraph)
-            if with_colors:
-                entry = colorize(entry, _STATUS_TO_COLOR[combined_result["level"]])
-            report.append(entry)
+        entry = wrap_paragraphs(entry, width=terminal_size[0])
+        if with_colors:
+            entry = colorize(entry, _STATUS_TO_COLOR[combined_result["level"]])
+        report.append(entry)
 
     # If there is no other message sent to the user, then we just give a
     # happy message to them.
