@@ -60,7 +60,6 @@ eus_support_parameters = [
         "eus-system-eus-phase-started-no-option-used",
     ],
 )
-@pytest.mark.test_eus_support
 def test_eus_support(
     convert2rhel,
     eus_mapping_update,
@@ -110,7 +109,6 @@ def test_eus_support(
             c2r.sendcontrol("c")
 
 
-@pytest.mark.test_rhsm_non_eus_account
 def test_rhsm_non_eus_account(convert2rhel):
     """
     Verify that Convert2RHEL is working properly when EUS repositories are not available for conversions

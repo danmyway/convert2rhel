@@ -53,7 +53,6 @@ els_support_parameters = [
     els_support_parameters,
     ids=["non-els-system-els-option-used", "els-system-els-phase-started-no-option-used"],
 )
-@pytest.mark.test_els_support
 def test_els_support(
     convert2rhel,
     install_and_set_up_subman_to_stagecdn,
@@ -92,7 +91,6 @@ def test_els_support(
             c2r.sendcontrol("c")
 
 
-@pytest.mark.test_rhsm_non_els_account
 def test_rhsm_non_els_account(convert2rhel):
     """
     Verify that Convert2RHEL is working properly when ELS repositories are not available for conversions

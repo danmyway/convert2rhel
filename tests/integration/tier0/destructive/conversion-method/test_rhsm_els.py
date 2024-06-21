@@ -1,9 +1,6 @@
-import pytest
-
 from conftest import TEST_VARS
 
 
-@pytest.mark.test_rhsm_els_conversion
 def test_rhsm_els_conversion(convert2rhel, shell, install_and_set_up_subman_to_stagecdn):
     """
     Verify that Convert2RHEL is working properly when ELS repositories are used during the conversion.

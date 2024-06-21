@@ -26,7 +26,6 @@ def problematic_third_party_package(shell):
         shell(f"yum remove -y {pkg}")
 
 
-@pytest.mark.test_list_third_party_pkgs_error
 def test_list_third_party_pkgs_error(convert2rhel, problematic_third_party_package):
     """
     This test verifies, that the  TASK - [Prepare: List third-party packages]

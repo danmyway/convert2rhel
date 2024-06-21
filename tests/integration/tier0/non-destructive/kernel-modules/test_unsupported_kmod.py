@@ -57,7 +57,6 @@ def kmod_in_different_directory(shell):
     shell("depmod")
 
 
-@pytest.mark.test_custom_module_loaded
 def test_error_if_custom_module_loaded(kmod_in_different_directory, convert2rhel):
     """
     This test verifies that rpmquery for detecting supported kernel modules in RHEL works correctly.
@@ -78,7 +77,6 @@ def test_error_if_custom_module_loaded(kmod_in_different_directory, convert2rhel
     assert c2r.exitstatus == 2
 
 
-@pytest.mark.test_custom_module_not_loaded
 def test_do_not_error_if_module_is_not_loaded(shell, convert2rhel):
     """
     Load the kmod from custom location.
@@ -135,7 +133,6 @@ def forced_kmods(shell):
     assert "(FE)" not in shell("cat /proc/modules").output
 
 
-@pytest.mark.test_force_loaded_kmod
 def test_error_if_module_is_force_loaded(shell, convert2rhel, forced_kmods):
     """
     In this test case we force load kmod and verify that the convert2rhel raises:
@@ -155,7 +152,6 @@ def test_error_if_module_is_force_loaded(shell, convert2rhel, forced_kmods):
 
 
 @pytest.mark.parametrize("envars", [["CONVERT2RHEL_TAINTED_KERNEL_MODULE_CHECK_SKIP"]])
-@pytest.mark.test_tainted_kernel_modules_check_override
 def test_tainted_kernel_modules_check_override(shell, convert2rhel, forced_kmods, environment_variables, envars):
     """
     In this test case we force load kmod and verify that the TAINTED_KMODS.TAINTED_KMODS_DETECTED
@@ -187,7 +183,6 @@ def test_tainted_kernel_modules_check_override(shell, convert2rhel, forced_kmods
     assert c2r.exitstatus == 1
 
 
-@pytest.mark.test_tainted_kernel_modules_error
 def test_tainted_kernel_modules_error(custom_kmod, convert2rhel):
     """
     This test marks the kernel as tainted which is not supported by convert2rhel.
@@ -214,7 +209,6 @@ def test_tainted_kernel_modules_error(custom_kmod, convert2rhel):
 
 
 @pytest.mark.parametrize("envars", [["CONVERT2RHEL_ALLOW_UNAVAILABLE_KMODS"]])
-@pytest.mark.test_unsupported_kmod_with_envar
 def test_envar_overrides_unsupported_module_loaded(
     kmod_in_different_directory, convert2rhel, environment_variables, envars
 ):

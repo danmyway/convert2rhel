@@ -25,7 +25,6 @@ def c2r_config_releasever(shell, backup_directory):
     assert shell(f"mv -f {backup_directory}/* {path_to_configs}").returncode == 0
 
 
-@pytest.mark.test_modified_config
 def test_releasever_as_mapping_config_modified(convert2rhel, os_release, c2r_config, shell, c2r_config_releasever):
     """
     Verify that releasever changes in /usr/share/convert2rhel/configs/ take precedence.
@@ -62,7 +61,6 @@ def system_release_backup(shell, backup_directory):
     assert shell(f"mv -f {backup_file} /etc/system-release").returncode == 0
 
 
-@pytest.mark.test_unknown_release
 def test_releasever_as_mapping_not_existing_release(convert2rhel, config_at, os_release, shell, system_release_backup):
     """
     Verify that running not allowed OS release inhibits the conversion.

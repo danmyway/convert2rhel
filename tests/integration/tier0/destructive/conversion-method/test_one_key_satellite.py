@@ -2,7 +2,6 @@ import pytest
 
 
 @pytest.mark.parametrize("satellite_registration", ["RHEL7_AND_CENTOS7_SAT_REG"], indirect=True)
-@pytest.mark.test_one_key_satellite_conversion
 def test_one_key_satellite_conversion(shell, convert2rhel, satellite_registration, remove_repositories):
     """
     Conversion method using the Satellite credentials for a registration.

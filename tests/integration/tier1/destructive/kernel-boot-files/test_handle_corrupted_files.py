@@ -2,8 +2,6 @@ import os
 import re
 import subprocess
 
-import pytest
-
 from conftest import SYSTEM_RELEASE_ENV, TEST_VARS
 
 
@@ -54,7 +52,6 @@ def restore_original_initramfs(shell, kernel_version):
     assert os.path.exists(initramfs_file)
 
 
-@pytest.mark.test_handle_corrupted_initramfs_file
 def test_corrupted_initramfs_file(convert2rhel, shell):
     """
     Verify, that an output with a warning message is sent to the user in case of a

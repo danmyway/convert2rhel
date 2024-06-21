@@ -2,8 +2,6 @@ import os
 
 from collections import namedtuple
 
-import pytest
-
 
 Config = namedtuple("Config", "path content")
 
@@ -21,7 +19,6 @@ def remove_files(config):
         os.remove(os.path.expanduser(cfg.path))
 
 
-@pytest.mark.test_config_custom_path_custom_filename
 def test_user_path_custom_filename(convert2rhel):
     config = [Config("~/.convert2rhel_custom.ini", "[subscription_manager]\nactivation_key = config_activationkey")]
     create_files(config)
@@ -34,7 +31,6 @@ def test_user_path_custom_filename(convert2rhel):
     remove_files(config)
 
 
-@pytest.mark.test_config_custom_path_standard_filename
 def test_user_path_std_filename(convert2rhel):
     config = [Config("~/.convert2rhel.ini", "[subscription_manager]\npassword = config_password")]
     create_files(config)
@@ -49,7 +45,6 @@ def test_user_path_std_filename(convert2rhel):
     remove_files(config)
 
 
-@pytest.mark.test_config_cli_priority
 def test_user_path_cli_priority(convert2rhel):
     config = [
         Config(
@@ -78,7 +73,6 @@ def test_user_path_cli_priority(convert2rhel):
     remove_files(config)
 
 
-@pytest.mark.test_config_standard_paths_priority_diff_methods
 def test_std_paths_priority_diff_methods(convert2rhel):
     config = [
         Config("~/.convert2rhel.ini", "[subscription_manager]\npassword = config_password"),
@@ -105,7 +99,6 @@ def test_std_paths_priority_diff_methods(convert2rhel):
     remove_files(config)
 
 
-@pytest.mark.test_config_standard_paths_priority
 def test_std_paths_priority(convert2rhel):
     config = [
         Config("~/.convert2rhel.ini", "[subscription_manager]\npassword = config_password"),

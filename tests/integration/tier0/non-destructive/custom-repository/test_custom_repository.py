@@ -49,7 +49,6 @@ def custom_repository(shell):
     assert shell(f"rm -f /etc/yum.repos.d/{AssignRepositoryVariables.repofile}.repo").returncode == 0
 
 
-@pytest.mark.test_custom_valid_repo_provided
 def test_good_conversion_without_rhsm(shell, convert2rhel, custom_repository):
     """
     Verify that --enablerepo is not skipped when subscription-manager is disabled.
@@ -64,7 +63,6 @@ def test_good_conversion_without_rhsm(shell, convert2rhel, custom_repository):
     assert c2r.exitstatus == 1
 
 
-@pytest.mark.test_custom_invalid_repo_provided
 def test_bad_conversion_without_rhsm(shell, convert2rhel, custom_repository):
     """
     Verify that --enablerepo is not skipped when subscription-manager is disabled.

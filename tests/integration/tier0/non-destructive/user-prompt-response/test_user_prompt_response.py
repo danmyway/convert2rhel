@@ -1,9 +1,6 @@
-import pytest
-
 from conftest import TEST_VARS
 
 
-@pytest.mark.test_empty_username_and_password
 def test_check_user_response_user_and_password(convert2rhel):
     """
     Run c2r registration with no username and password provided.
